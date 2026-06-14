@@ -259,7 +259,7 @@ export default function ResultsPage() {
       {activeTab === 'raw' && (
         <div className="animate-fade-in">
           <pre className="rounded-2xl p-5 text-sm overflow-x-auto font-mono leading-relaxed max-h-[60vh] overflow-y-auto border"
-               style={{ background: 'var(--bg-card)', color: 'var(--text-secondary')', borderColor: 'var(--border)' }}>
+               style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', borderColor: 'var(--border)' }}>
             {JSON.stringify(data, null, 2)}
           </pre>
         </div>
