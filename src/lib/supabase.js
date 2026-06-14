@@ -1,9 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://yhpxqnkcltdocwqrcbcv.supabase.co'
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+// Anon key is a public key safe to commit — replace with real key from Supabase > Settings > API
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'anon-key-placeholder'
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const isConfigured = !!import.meta.env.VITE_SUPABASE_ANON_KEY
 
 // Upload file to Supabase Storage
 export async function uploadDocument(file, userId = 'anonymous') {
