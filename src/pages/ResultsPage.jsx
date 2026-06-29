@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   CheckCircle2, Copy, Download, ArrowLeft, FileText,
   Building2, Calendar, DollarSign, Hash, Tag, Table2,
-  Loader2, AlertCircle, ExternalLink
+  Loader2, AlertCircle, ExternalLink, ChevronLeft, ChevronRight, Eye, EyeOff
 } from 'lucide-react'
 import { getOcrResult, supabase } from '../lib/supabase.js'
 
@@ -81,6 +81,8 @@ export default function ResultsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('fields')
+  const [selectedPage, setSelectedPage] = useState('all') // 'all' or a page index (0-based)
+  const [showRawText, setShowRawText] = useState(false)
 
   useEffect(() => {
     loadResults()
@@ -161,10 +163,14 @@ export default function ResultsPage() {
     )
   }
 
-  const data = result.extracted_data || {}
+  const mergedData = result.extracted_data || {}
   const pages = result.metadata?.pages || null
   const totalPages = result.metadata?.total_pages || pages?.length || 1
   const isMultiPage = totalPages > 1
+
+  const currentPage = selectedPage !== 'all' && pages ? pages[selectedPage] : null
+  const data = currentPage ? (currentPage.extracted_data || {}) : mergedData
+  const currentRawText = currentPage ? currentPage.raw_text : (pages || []).map(p => `--- Page ${p.page} ---\n${p.raw_text || ''}`).join('\n\n')
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
@@ -214,7 +220,7 @@ export default function ResultsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-slate-900 rounded-xl p-1 border border-slate-800 w-fit">
+      <div className="flex gap-1 mb-4 bg-slate-900 rounded-xl p-1 border border-slate-800 w-fit">
         {['fields', 'line_items', ...(isMultiPage ? ['pages'] : []), 'raw'].map(tab => (
           <button
             key={tab}
@@ -230,6 +236,46 @@ export default function ResultsPage() {
         ))}
       </div>
 
+      {/* Shared page selector — applies to every tab above */}
+      {isMultiPage && pages && (
+        <div className="flex items-center gap-1.5 mb-6 flex-wrap">
+          <span className="text-xs text-slate-500 mr-1">Viewing:</span>
+          <button
+            onClick={() => { setSelectedPage('all'); setShowRawText(false) }}
+            className={`px-3 h-8 rounded-lg text-sm font-medium transition-colors ${
+              selectedPage === 'all' ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            All pages
+          </button>
+          <button
+            onClick={() => setSelectedPage(i => i === 'all' ? 0 : Math.max(0, i - 1))}
+            disabled={selectedPage === 'all'}
+            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          {pages.map((p, i) => (
+            <button
+              key={p.page}
+              onClick={() => { setSelectedPage(i); setShowRawText(false) }}
+              className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                selectedPage === i ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              {p.page}
+            </button>
+          ))}
+          <button
+            onClick={() => setSelectedPage(i => i === 'all' ? pages.length - 1 : Math.min(pages.length - 1, i + 1))}
+            disabled={selectedPage === pages.length - 1}
+            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      )}
+
       {/* Tab content */}
       {activeTab === 'fields' && (
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 animate-fade-in">
@@ -243,8 +289,11 @@ export default function ResultsPage() {
           <FieldCard icon={Tag}        label="Currency"      value={data.currency}        color="text-cyan-400" />
           <FieldCard icon={Building2}  label="Vendor Address" value={data.vendor_address} color="text-slate-400" />
           <FieldCard icon={Hash}       label="PO Number"     value={data.po_number}       color="text-violet-400" />
-          <FieldCard icon={FileText}   label="Payment Terms" value={data.payment_terms}   color="text-amber-400" />
-          <FieldCard icon={Hash}       label="Bank Details"  value={data.bank_details}    color="text-teal-400" />
+          <FieldCard icon={FileText}   label="Payment Term"  value={data.payment_term}    color="text-amber-400" />
+          <FieldCard icon={Hash}       label="Bank Name"     value={data.bank_name}       color="text-teal-400" />
+          <FieldCard icon={Hash}       label="Bank Account"  value={data.bank_account_number} color="text-teal-400" />
+          <FieldCard icon={Hash}       label="Sales Order #" value={data.sales_order_number} color="text-violet-400" />
+          <FieldCard icon={FileText}   label="Signatory"     value={data.signatory_name}  color="text-amber-400" />
         </div>
       )}
 
@@ -262,37 +311,51 @@ export default function ResultsPage() {
 
       {activeTab === 'pages' && pages && (
         <div className="animate-fade-in space-y-4">
-          {pages.map((p) => (
-            <div key={p.page} className="bg-slate-800/50 border border-slate-700/60 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
+          <div className="bg-slate-800/50 border border-slate-700/60 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
                 <FileText size={14} className="text-brand-400" />
-                <span className="text-sm font-semibold text-white">Page {p.page} of {totalPages}</span>
-                <span className="text-xs text-slate-500">· {p.extracted_data?.line_items?.length || 0} line items</span>
+                <span className="text-sm font-semibold text-white">
+                  {currentPage ? `Page ${currentPage.page} of ${totalPages}` : `All ${totalPages} pages (merged)`}
+                </span>
+                <span className="text-xs text-slate-500">· {data.line_items?.length || 0} line items</span>
               </div>
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 mb-3">
-                {Object.entries(p.extracted_data || {})
-                  .filter(([k]) => k !== 'line_items' && k !== 'raw_text')
-                  .map(([k, v]) => (
-                    <div key={k} className="text-xs">
-                      <span className="text-slate-500 uppercase tracking-wider">{k}: </span>
-                      <span className="text-slate-200">{v != null && v !== '' ? String(v) : '—'}</span>
-                    </div>
-                  ))}
-              </div>
-              {p.extracted_data?.line_items?.length > 0 && (
-                <LineItemsTable items={p.extracted_data.line_items} />
-              )}
-              <details className="mt-3">
-                <summary className="text-xs text-slate-500 cursor-pointer hover:text-slate-300">Raw text for this page</summary>
-                <pre className="mt-2 text-xs text-slate-400 whitespace-pre-wrap font-mono bg-slate-900 rounded-lg p-3 max-h-60 overflow-y-auto">{p.raw_text}</pre>
-              </details>
+              <button
+                onClick={() => setShowRawText(v => !v)}
+                className="btn-secondary text-xs py-1.5 px-2.5 flex items-center gap-1.5"
+              >
+                {showRawText ? <EyeOff size={13} /> : <Eye size={13} />}
+                {showRawText ? 'Hide full text' : 'Show full text'}
+              </button>
             </div>
-          ))}
+
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 mb-3">
+              {Object.entries(data)
+                .filter(([k]) => k !== 'line_items' && k !== 'raw_text')
+                .map(([k, v]) => (
+                  <div key={k} className="text-xs">
+                    <span className="text-slate-500 uppercase tracking-wider">{k}: </span>
+                    <span className="text-slate-200">{v != null && v !== '' ? String(v) : '—'}</span>
+                  </div>
+                ))}
+            </div>
+
+            {data.line_items?.length > 0 && (
+              <LineItemsTable items={data.line_items} />
+            )}
+
+            {showRawText && (
+              <pre className="mt-3 text-xs text-slate-300 whitespace-pre-wrap font-mono bg-slate-900 border border-slate-700/60 rounded-lg p-3 max-h-96 overflow-y-auto">{currentRawText}</pre>
+            )}
+          </div>
         </div>
       )}
 
       {activeTab === 'raw' && (
         <div className="animate-fade-in">
+          <p className="text-xs text-slate-500 mb-2">
+            {currentPage ? `Page ${currentPage.page} of ${totalPages}` : 'All pages merged'}
+          </p>
           <pre className="bg-slate-900 border border-slate-700/60 rounded-2xl p-5 text-sm text-slate-300 overflow-x-auto font-mono leading-relaxed max-h-[60vh] overflow-y-auto">
             {JSON.stringify(data, null, 2)}
           </pre>

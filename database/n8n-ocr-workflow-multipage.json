@@ -40,11 +40,11 @@
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+              "value": "={{ $vars.SUPABASE_SERVICE_KEY }}"
             },
             {
               "name": "Authorization",
-              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+              "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}"
             },
             {
               "name": "Content-Type",
@@ -67,27 +67,6 @@
       "typeVersion": 4,
       "position": [
         688,
-        480
-      ]
-    },
-    {
-      "parameters": {
-        "method": "GET",
-        "url": "={{ $json.fileUrl }}",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "file"
-            }
-          }
-        }
-      },
-      "id": "download-file",
-      "name": "Download File",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [
-        912,
         480
       ]
     },
@@ -125,7 +104,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://YOUR_VERCEL_DOMAIN/api/pdf-to-images",
+        "url": "https://scgjwd-pricingv2.vercel.app/api/pdf-to-images",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -168,7 +147,8 @@
     },
     {
       "parameters": {
-        "jsCode": "const meta = $('Validate & Prepare').first().json;\nconst p = $json;\nreturn { json: {\n  documentId: meta.documentId,\n  runId: meta.runId,\n  fileName: meta.fileName,\n  startedAt: meta.startedAt,\n  isImage: false,\n  page: p.page,\n  totalPages: p.totalPages,\n  imageUrl: p.dataUrl\n}};"
+        "jsCode": "const meta = $('Validate & Prepare').first().json;\nconst p = $json;\nreturn { json: {\n  documentId: meta.documentId,\n  runId: meta.runId,\n  fileName: meta.fileName,\n  startedAt: meta.startedAt,\n  isImage: false,\n  page: p.page,\n  totalPages: p.totalPages,\n  imageUrl: p.dataUrl\n}};",
+        "mode": "runOnceForEachItem"
       },
       "id": "tag-pdf-pages",
       "name": "Tag PDF Page Metadata",
@@ -195,8 +175,7 @@
     },
     {
       "parameters": {
-        "mode": "combine",
-        "combinationMode": "mergeByPosition",
+        "mode": "append",
         "options": {}
       },
       "id": "merge-pages",
@@ -218,7 +197,7 @@
           "parameters": [
             {
               "name": "api-key",
-              "value": "={{ $env.AZURE_OPENAI_API_KEY }}"
+              "value": "={{ $vars.AZURE_OPENAI_API_KEY }}"
             },
             {
               "name": "Content-Type",
@@ -228,7 +207,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ (() => {\n  const sysMsg = \"You are an expert OCR system for shipping and trade documents (Bill of Lading, Commercial Invoice, Packing List). Extract ALL structured data visible on THIS PAGE and return ONLY valid JSON (no markdown, no code blocks) with exactly these fields. For BL documents: shipper=vendor_name, B/L No=bl_number, vessel=vessel_name, POL=port_of_loading, POD=port_of_discharge. For invoices: use invoice_number, invoice_date. Always populate raw_text with ALL visible text on this page, including stamps, tables and footnotes. Use null for fields not present on this page. Return: {document_type,vendor_name,vendor_address,consignee_name,consignee_address,invoice_number,invoice_date,bl_number,vessel_name,port_of_loading,port_of_discharge,total_amount,currency,line_items:[{description,hs_code,quantity,unit,unit_price,amount}],raw_text}\";\n  const userText = \"Extract all structured data from this shipping document page. File: \" + $json.fileName + \" (page \" + $json.page + \" of \" + $json.totalPages + \")\";\n  const userContent = [\n    { type: \"text\", text: userText },\n    { type: \"image_url\", image_url: { url: $json.imageUrl, detail: \"high\" } }\n  ];\n  return JSON.stringify({ messages: [{ role: \"system\", content: sysMsg }, { role: \"user\", content: userContent }], temperature: 0, max_tokens: 4096 });\n})() }}",
+        "jsonBody": "={{ (() => {\n  const sysMsg = \"You are an expert OCR system for shipping and trade documents (Bill of Lading, Commercial Invoice, Packing List). Extract ALL structured data visible on THIS PAGE and return ONLY valid JSON (no markdown, no code blocks) with exactly these fields. For BL documents: shipper=vendor_name, B/L No=bl_number, vessel=vessel_name, POL=port_of_loading, POD=port_of_discharge. For invoices: use invoice_number, invoice_date. Capture EVERY field visible anywhere on the page, including small print, stamps, tables, bank details boxes, and signature blocks. Always populate raw_text with ALL visible text on this page. Use null for fields not present on this page. Return: {document_type,vendor_name,vendor_address,consignee_name,consignee_address,invoice_number,invoice_date,bl_number,vessel_name,port_of_loading,port_of_discharge,total_amount,currency,po_number,sales_order_number,customer_ref,payment_term,delivery_term,fob_value,freight_amount,insurance_amount,bank_name,bank_account_number,bank_swift_code,bank_beneficiary,bank_address,signatory_name,signatory_title,line_items:[{description,hs_code,quantity,unit,unit_price,discount_amount,amount}],raw_text}\";\n  const userText = \"Extract all structured data from this shipping document page. File: \" + $json.fileName + \" (page \" + $json.page + \" of \" + $json.totalPages + \")\";\n  const userContent = [\n    { type: \"text\", text: userText },\n    { type: \"image_url\", image_url: { url: $json.imageUrl, detail: \"high\" } }\n  ];\n  return JSON.stringify({ messages: [{ role: \"system\", content: sysMsg }, { role: \"user\", content: userContent }], temperature: 0, max_tokens: 4096 });\n})() }}",
         "options": {}
       },
       "id": "gpt4o-ocr",
@@ -242,7 +221,8 @@
     },
     {
       "parameters": {
-        "jsCode": "const raw = $json.choices?.[0]?.message?.content || '{}';\nlet extracted;\ntry {\n  const cleaned = raw.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\n  extracted = JSON.parse(cleaned);\n} catch (e) {\n  extracted = { raw_text: raw, parse_error: e.message };\n}\nconst pageMeta = $('Merge Pages').item.json;\nreturn { json: {\n  documentId: pageMeta.documentId,\n  runId: pageMeta.runId,\n  fileName: pageMeta.fileName,\n  startedAt: pageMeta.startedAt,\n  page: pageMeta.page,\n  totalPages: pageMeta.totalPages,\n  extractedData: extracted,\n  rawText: extracted.raw_text || raw\n}};"
+        "jsCode": "const raw = $json.choices?.[0]?.message?.content || '{}';\nlet extracted;\ntry {\n  const cleaned = raw.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\n  extracted = JSON.parse(cleaned);\n} catch (e) {\n  extracted = { raw_text: raw, parse_error: e.message };\n}\nconst pageMeta = $('Merge Pages').item.json;\nreturn { json: {\n  documentId: pageMeta.documentId,\n  runId: pageMeta.runId,\n  fileName: pageMeta.fileName,\n  startedAt: pageMeta.startedAt,\n  page: pageMeta.page,\n  totalPages: pageMeta.totalPages,\n  extractedData: extracted,\n  rawText: extracted.raw_text || raw\n}};",
+        "mode": "runOnceForEachItem"
       },
       "id": "parse-page-output",
       "name": "Parse Page Output",
@@ -256,7 +236,7 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const items = $input.all().map(i => i.json).sort((a, b) => (a.page || 0) - (b.page || 0));\nconst meta = items[0] || {};\nconst totalPages = meta.totalPages || items.length;\n\nconst pages = items.map(it => ({\n  page: it.page,\n  extracted_data: it.extractedData,\n  raw_text: it.rawText\n}));\n\n// Merge structured fields across pages: first non-null wins, line_items concatenated\nconst scalarFields = ['document_type','vendor_name','vendor_address','consignee_name','consignee_address',\n  'invoice_number','invoice_date','bl_number','vessel_name','port_of_loading','port_of_discharge','total_amount','currency'];\nconst merged = {};\nfor (const f of scalarFields) {\n  merged[f] = null;\n  for (const it of items) {\n    const v = it.extractedData?.[f];\n    if (v !== null && v !== undefined && v !== '') { merged[f] = v; break; }\n  }\n}\nmerged.line_items = items.flatMap(it => Array.isArray(it.extractedData?.line_items) ? it.extractedData.line_items : []);\nmerged.page_count = totalPages;\n\nconst rawTextCombined = items.map(it => `--- Page ${it.page} of ${totalPages} ---\\n${it.rawText || ''}`).join('\\n\\n');\n\nreturn [{ json: {\n  documentId: meta.documentId,\n  runId: meta.runId,\n  fileName: meta.fileName,\n  startedAt: meta.startedAt,\n  totalPages,\n  extractedData: merged,\n  rawText: rawTextCombined,\n  pages,\n  confidenceScore: 0.95,\n  modelUsed: 'gpt-4o-mini',\n  processingMs: Date.now() - new Date(meta.startedAt).getTime()\n}}];"
+        "jsCode": "const items = $input.all().map(i => i.json).sort((a, b) => (a.page || 0) - (b.page || 0));\nconst meta = items[0] || {};\nconst totalPages = meta.totalPages || items.length;\n\nconst pages = items.map(it => ({\n  page: it.page,\n  extracted_data: it.extractedData,\n  raw_text: it.rawText\n}));\n\n// Merge structured fields across pages: first non-null wins, line_items concatenated\nconst scalarFields = ['document_type','vendor_name','vendor_address','consignee_name','consignee_address','invoice_number','invoice_date','bl_number','vessel_name','port_of_loading','port_of_discharge','total_amount','currency','po_number','sales_order_number','customer_ref','payment_term','delivery_term','fob_value','freight_amount','insurance_amount','bank_name','bank_account_number','bank_swift_code','bank_beneficiary','bank_address','signatory_name','signatory_title'];\nconst merged = {};\nfor (const f of scalarFields) {\n  merged[f] = null;\n  for (const it of items) {\n    const v = it.extractedData?.[f];\n    if (v !== null && v !== undefined && v !== '') { merged[f] = v; break; }\n  }\n}\nmerged.line_items = items.flatMap(it => Array.isArray(it.extractedData?.line_items) ? it.extractedData.line_items : []);\nmerged.page_count = totalPages;\n\nconst rawTextCombined = items.map(it => `--- Page ${it.page} of ${totalPages} ---\\n${it.rawText || ''}`).join('\\n\\n');\n\nreturn [{ json: {\n  documentId: meta.documentId,\n  runId: meta.runId,\n  fileName: meta.fileName,\n  startedAt: meta.startedAt,\n  totalPages,\n  extractedData: merged,\n  rawText: rawTextCombined,\n  pages,\n  confidenceScore: 0.95,\n  modelUsed: 'gpt-4o-mini',\n  processingMs: Date.now() - new Date(meta.startedAt).getTime()\n}}];"
       },
       "id": "aggregate-results",
       "name": "Aggregate Pages Into Final Result",
@@ -277,11 +257,11 @@
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+              "value": "={{ $vars.SUPABASE_SERVICE_KEY }}"
             },
             {
               "name": "Authorization",
-              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+              "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}"
             },
             {
               "name": "Content-Type",
@@ -311,17 +291,17 @@
     {
       "parameters": {
         "method": "PATCH",
-        "url": "=https://yhpxqnkcltdocwqrcbcv.supabase.co/rest/v1/workflow_runs?id=eq.{{ $json.runId }}",
+        "url": "=https://yhpxqnkcltdocwqrcbcv.supabase.co/rest/v1/workflow_runs?id=eq.{{ $('Aggregate Pages Into Final Result').item.json.runId }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+              "value": "={{ $vars.SUPABASE_SERVICE_KEY }}"
             },
             {
               "name": "Authorization",
-              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+              "value": "=Bearer {{ $vars.SUPABASE_SERVICE_KEY }}"
             },
             {
               "name": "Content-Type",
@@ -346,7 +326,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={ \"success\": true, \"runId\": \"{{ $json.runId }}\", \"totalPages\": {{ $json.totalPages }} }",
+        "responseBody": "={ \"success\": true, \"runId\": \"{{ $('Aggregate Pages Into Final Result').item.json.runId }}\", \"totalPages\": {{ $('Aggregate Pages Into Final Result').item.json.totalPages }} }",
         "options": {}
       },
       "id": "respond-webhook",
@@ -399,17 +379,6 @@
       ]
     },
     "Update Status: Processing": {
-      "main": [
-        [
-          {
-            "node": "Download File",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Download File": {
       "main": [
         [
           {
