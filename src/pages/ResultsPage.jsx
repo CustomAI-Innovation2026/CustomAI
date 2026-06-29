@@ -162,6 +162,9 @@ export default function ResultsPage() {
   }
 
   const data = result.extracted_data || {}
+  const pages = result.metadata?.pages || null
+  const totalPages = result.metadata?.total_pages || pages?.length || 1
+  const isMultiPage = totalPages > 1
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
@@ -184,6 +187,7 @@ export default function ResultsPage() {
               <p className="text-slate-400 text-sm">
                 Extracted {Object.keys(data).length} fields ·{' '}
                 Confidence: <span className="text-green-400 font-medium">{result.confidence_score ? `${Math.round(result.confidence_score * 100)}%` : 'N/A'}</span>
+                {isMultiPage && <> · <span className="text-brand-400 font-medium">{totalPages} pages</span></>}
               </p>
             </div>
           </div>
@@ -211,7 +215,7 @@ export default function ResultsPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 bg-slate-900 rounded-xl p-1 border border-slate-800 w-fit">
-        {['fields', 'line_items', 'raw'].map(tab => (
+        {['fields', 'line_items', ...(isMultiPage ? ['pages'] : []), 'raw'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -221,7 +225,7 @@ export default function ResultsPage() {
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            {tab === 'fields' ? 'Extracted Fields' : tab === 'line_items' ? 'Line Items' : 'Raw JSON'}
+            {tab === 'fields' ? 'Extracted Fields' : tab === 'line_items' ? 'Line Items' : tab === 'pages' ? `Pages (${totalPages})` : 'Raw JSON'}
           </button>
         ))}
       </div>
@@ -253,6 +257,37 @@ export default function ResultsPage() {
             </p>
           </div>
           <LineItemsTable items={data.line_items} />
+        </div>
+      )}
+
+      {activeTab === 'pages' && pages && (
+        <div className="animate-fade-in space-y-4">
+          {pages.map((p) => (
+            <div key={p.page} className="bg-slate-800/50 border border-slate-700/60 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <FileText size={14} className="text-brand-400" />
+                <span className="text-sm font-semibold text-white">Page {p.page} of {totalPages}</span>
+                <span className="text-xs text-slate-500">· {p.extracted_data?.line_items?.length || 0} line items</span>
+              </div>
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 mb-3">
+                {Object.entries(p.extracted_data || {})
+                  .filter(([k]) => k !== 'line_items' && k !== 'raw_text')
+                  .map(([k, v]) => (
+                    <div key={k} className="text-xs">
+                      <span className="text-slate-500 uppercase tracking-wider">{k}: </span>
+                      <span className="text-slate-200">{v != null && v !== '' ? String(v) : '—'}</span>
+                    </div>
+                  ))}
+              </div>
+              {p.extracted_data?.line_items?.length > 0 && (
+                <LineItemsTable items={p.extracted_data.line_items} />
+              )}
+              <details className="mt-3">
+                <summary className="text-xs text-slate-500 cursor-pointer hover:text-slate-300">Raw text for this page</summary>
+                <pre className="mt-2 text-xs text-slate-400 whitespace-pre-wrap font-mono bg-slate-900 rounded-lg p-3 max-h-60 overflow-y-auto">{p.raw_text}</pre>
+              </details>
+            </div>
+          ))}
         </div>
       )}
 

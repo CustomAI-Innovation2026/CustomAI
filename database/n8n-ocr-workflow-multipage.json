@@ -1,0 +1,569 @@
+{
+  "name": "DocScan AI OCR Pipeline (Multi-Page PDF)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ocr-trigger",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-start",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        240,
+        480
+      ],
+      "webhookId": "ocr-trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst required = ['documentId', 'fileUrl', 'workflowType', 'runId'];\nfor (const key of required) {\n  if (!body[key]) throw new Error('Missing required field: ' + key);\n}\nreturn [{ json: {\n  documentId: body.documentId,\n  fileUrl: body.fileUrl,\n  fileName: body.fileName || 'document',\n  workflowType: body.workflowType || 'invoice_ocr',\n  runId: body.runId,\n  startedAt: new Date().toISOString()\n}}];"
+      },
+      "id": "validate-input",
+      "name": "Validate & Prepare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://yhpxqnkcltdocwqrcbcv.supabase.co/rest/v1/workflow_runs?id=eq.{{ $json.runId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"status\": \"processing\", \"started_at\": \"{{ $json.startedAt }}\" }",
+        "options": {}
+      },
+      "id": "update-status-processing",
+      "name": "Update Status: Processing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        688,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.fileUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "download-file",
+      "name": "Download File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        912,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Validate & Prepare').item.json.fileName }}",
+              "rightValue": ".pdf",
+              "operator": {
+                "type": "string",
+                "operation": "endsWith"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "detect-pdf",
+      "name": "Is PDF?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR_VERCEL_DOMAIN/api/pdf-to-images",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"fileUrl\": \"{{ $('Validate & Prepare').item.json.fileUrl }}\" }",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "pdf-to-images",
+      "name": "Convert PDF to Page Images (HTTP)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1360,
+        320
+      ],
+      "notes": "Replace YOUR_VERCEL_DOMAIN with your deployed app's domain (e.g. scgjwd-pricingv-2.vercel.app). Calls the api/pdf-to-images.js serverless function, which uses mupdf (WASM, no native deps) to rasterize every PDF page to a PNG and returns { totalPages, pages: [{page, totalPages, dataUrl}] }. This avoids needing Execute Command, which is disabled on n8n Cloud / managed instances."
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "pages",
+        "options": {}
+      },
+      "id": "split-pages",
+      "name": "Split Out Pages",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1584,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const meta = $('Validate & Prepare').first().json;\nconst p = $json;\nreturn { json: {\n  documentId: meta.documentId,\n  runId: meta.runId,\n  fileName: meta.fileName,\n  startedAt: meta.startedAt,\n  isImage: false,\n  page: p.page,\n  totalPages: p.totalPages,\n  imageUrl: p.dataUrl\n}};"
+      },
+      "id": "tag-pdf-pages",
+      "name": "Tag PDF Page Metadata",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1808,
+        320
+      ],
+      "notes": "Runs once per page image returned by the HTTP conversion endpoint. Attaches documentId/runId/fileName plus this page's number and the total page count so results can be split per page downstream."
+    },
+    {
+      "parameters": {
+        "jsCode": "const meta = $('Validate & Prepare').first().json;\nreturn [{ json: {\n  documentId: meta.documentId,\n  runId: meta.runId,\n  fileName: meta.fileName,\n  startedAt: meta.startedAt,\n  isImage: true,\n  page: 1,\n  totalPages: 1,\n  imageUrl: meta.fileUrl\n}}];"
+      },
+      "id": "tag-single-image",
+      "name": "Tag Single Image (page 1 of 1)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "merge-pages",
+      "name": "Merge Pages",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        2256,
+        480
+      ],
+      "notes": "Combines the PDF-page branch and the single-image branch back into one stream of page items, each item = one page to OCR."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://cogopenai-scgjwdllmchat002-dev.openai.azure.com/openai/deployments/gpt-4o-mini/chat/completions?api-version=2025-01-01-preview",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api-key",
+              "value": "={{ $env.AZURE_OPENAI_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => {\n  const sysMsg = \"You are an expert OCR system for shipping and trade documents (Bill of Lading, Commercial Invoice, Packing List). Extract ALL structured data visible on THIS PAGE and return ONLY valid JSON (no markdown, no code blocks) with exactly these fields. For BL documents: shipper=vendor_name, B/L No=bl_number, vessel=vessel_name, POL=port_of_loading, POD=port_of_discharge. For invoices: use invoice_number, invoice_date. Always populate raw_text with ALL visible text on this page, including stamps, tables and footnotes. Use null for fields not present on this page. Return: {document_type,vendor_name,vendor_address,consignee_name,consignee_address,invoice_number,invoice_date,bl_number,vessel_name,port_of_loading,port_of_discharge,total_amount,currency,line_items:[{description,hs_code,quantity,unit,unit_price,amount}],raw_text}\";\n  const userText = \"Extract all structured data from this shipping document page. File: \" + $json.fileName + \" (page \" + $json.page + \" of \" + $json.totalPages + \")\";\n  const userContent = [\n    { type: \"text\", text: userText },\n    { type: \"image_url\", image_url: { url: $json.imageUrl, detail: \"high\" } }\n  ];\n  return JSON.stringify({ messages: [{ role: \"system\", content: sysMsg }, { role: \"user\", content: userContent }], temperature: 0, max_tokens: 4096 });\n})() }}",
+        "options": {}
+      },
+      "id": "gpt4o-ocr",
+      "name": "GPT-4o Vision OCR (per page)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2480,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.choices?.[0]?.message?.content || '{}';\nlet extracted;\ntry {\n  const cleaned = raw.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\n  extracted = JSON.parse(cleaned);\n} catch (e) {\n  extracted = { raw_text: raw, parse_error: e.message };\n}\nconst pageMeta = $('Merge Pages').item.json;\nreturn { json: {\n  documentId: pageMeta.documentId,\n  runId: pageMeta.runId,\n  fileName: pageMeta.fileName,\n  startedAt: pageMeta.startedAt,\n  page: pageMeta.page,\n  totalPages: pageMeta.totalPages,\n  extractedData: extracted,\n  rawText: extracted.raw_text || raw\n}};"
+      },
+      "id": "parse-page-output",
+      "name": "Parse Page Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2704,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all().map(i => i.json).sort((a, b) => (a.page || 0) - (b.page || 0));\nconst meta = items[0] || {};\nconst totalPages = meta.totalPages || items.length;\n\nconst pages = items.map(it => ({\n  page: it.page,\n  extracted_data: it.extractedData,\n  raw_text: it.rawText\n}));\n\n// Merge structured fields across pages: first non-null wins, line_items concatenated\nconst scalarFields = ['document_type','vendor_name','vendor_address','consignee_name','consignee_address',\n  'invoice_number','invoice_date','bl_number','vessel_name','port_of_loading','port_of_discharge','total_amount','currency'];\nconst merged = {};\nfor (const f of scalarFields) {\n  merged[f] = null;\n  for (const it of items) {\n    const v = it.extractedData?.[f];\n    if (v !== null && v !== undefined && v !== '') { merged[f] = v; break; }\n  }\n}\nmerged.line_items = items.flatMap(it => Array.isArray(it.extractedData?.line_items) ? it.extractedData.line_items : []);\nmerged.page_count = totalPages;\n\nconst rawTextCombined = items.map(it => `--- Page ${it.page} of ${totalPages} ---\\n${it.rawText || ''}`).join('\\n\\n');\n\nreturn [{ json: {\n  documentId: meta.documentId,\n  runId: meta.runId,\n  fileName: meta.fileName,\n  startedAt: meta.startedAt,\n  totalPages,\n  extractedData: merged,\n  rawText: rawTextCombined,\n  pages,\n  confidenceScore: 0.95,\n  modelUsed: 'gpt-4o-mini',\n  processingMs: Date.now() - new Date(meta.startedAt).getTime()\n}}];"
+      },
+      "id": "aggregate-results",
+      "name": "Aggregate Pages Into Final Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2928,
+        480
+      ],
+      "notes": "Collects all per-page OCR outputs, sorts by page number, merges scalar fields (first page that has a value wins) and concatenates line_items + raw_text across pages. Keeps the full per-page breakdown in 'pages' for the frontend."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://yhpxqnkcltdocwqrcbcv.supabase.co/rest/v1/ocr_results",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"document_id\": \"{{ $json.documentId }}\",\n  \"workflow_run_id\": \"{{ $json.runId }}\",\n  \"extracted_data\": {{ JSON.stringify($json.extractedData) }},\n  \"raw_text\": {{ JSON.stringify($json.rawText) }},\n  \"confidence_score\": {{ $json.confidenceScore }},\n  \"model_used\": \"{{ $json.modelUsed }}\",\n  \"processing_ms\": {{ $json.processingMs }},\n  \"metadata\": {{ JSON.stringify({ total_pages: $json.totalPages, pages: $json.pages }) }}\n}",
+        "options": {}
+      },
+      "id": "save-ocr-result",
+      "name": "Save OCR Result to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3152,
+        480
+      ],
+      "notes": "Stores the per-page breakdown in the existing 'metadata' jsonb column on ocr_results — no schema migration needed."
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://yhpxqnkcltdocwqrcbcv.supabase.co/rest/v1/workflow_runs?id=eq.{{ $json.runId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"status\": \"completed\", \"completed_at\": \"{{ new Date().toISOString() }}\" }",
+        "options": {}
+      },
+      "id": "update-status-completed",
+      "name": "Update Status: Completed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3376,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"success\": true, \"runId\": \"{{ $json.runId }}\", \"totalPages\": {{ $json.totalPages }} }",
+        "options": {}
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        3600,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Prerequisites for multi-page PDF support\n1. **Deploy api/pdf-to-images.js to Vercel** (uses the `mupdf` WASM package — no native deps, works on n8n Cloud since it avoids Execute Command which is disabled there). Update the 'Convert PDF to Page Images (HTTP)' node's URL with your real Vercel domain.\n2. No Supabase schema migration needed — per-page results are stored in the existing `ocr_results.metadata` jsonb column as `{ total_pages, pages: [{page, extracted_data, raw_text}] }`.\n3. Each PDF page is rendered at 200 DPI and OCR'd independently with GPT-4o-mini Vision, then merged: scalar fields take the first page that has a value, line_items and raw_text are concatenated across all pages.\n4. Vercel function caps at 30 pages per PDF — raise MAX_PAGES in api/pdf-to-images.js if you need more.",
+        "height": 280,
+        "width": 460
+      },
+      "id": "sticky-notes",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        80
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate & Prepare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Prepare": {
+      "main": [
+        [
+          {
+            "node": "Update Status: Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Status: Processing": {
+      "main": [
+        [
+          {
+            "node": "Download File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download File": {
+      "main": [
+        [
+          {
+            "node": "Is PDF?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is PDF?": {
+      "main": [
+        [
+          {
+            "node": "Convert PDF to Page Images (HTTP)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tag Single Image (page 1 of 1)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert PDF to Page Images (HTTP)": {
+      "main": [
+        [
+          {
+            "node": "Split Out Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out Pages": {
+      "main": [
+        [
+          {
+            "node": "Tag PDF Page Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag PDF Page Metadata": {
+      "main": [
+        [
+          {
+            "node": "Merge Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Single Image (page 1 of 1)": {
+      "main": [
+        [
+          {
+            "node": "Merge Pages",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Pages": {
+      "main": [
+        [
+          {
+            "node": "GPT-4o Vision OCR (per page)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-4o Vision OCR (per page)": {
+      "main": [
+        [
+          {
+            "node": "Parse Page Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Page Output": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Pages Into Final Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Pages Into Final Result": {
+      "main": [
+        [
+          {
+            "node": "Save OCR Result to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save OCR Result to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Update Status: Completed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Status: Completed": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "instanceId": "202645f6948beaa8b50070d71cc266262b23386ee9b3b553e958889507c9cb27"
+  },
+  "id": "qN5KDFqloUJjyS28-multipage",
+  "tags": [
+    {
+      "updatedAt": "2026-06-29T00:00:00.000Z",
+      "createdAt": "2026-06-29T00:00:00.000Z",
+      "id": "dSMHrsPOVOaplgl7",
+      "name": "CustomAI"
+    }
+  ]
+}
