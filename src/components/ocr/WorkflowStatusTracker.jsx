@@ -144,11 +144,47 @@ export default function WorkflowStatusTracker({
   const isError = workflowStatus === 'failed'
   const isComplete = workflowStatus === 'completed'
 
-  const WORKFLOW_OPTIONS = [
-    { id: 'invoice_ocr',       label: 'Invoice OCR (Fast)',            est: '~10s' },
-    { id: 'advanced_llm',      label: 'Advanced LLM Layout Analysis',  est: '~25s' },
-    { id: 'document_comparison', label: 'Invoice Reconciliation',        est: '~20s' },
+  const DOC_TYPES = [
+    {
+      id: 'bill_of_lading',
+      label: 'Bill of Lading',
+      shortLabel: 'BL',
+      desc: '46 fields · BL#, containers, cargo, parties',
+      icon: '🚢',
+      color: 'blue',
+    },
+    {
+      id: 'invoice',
+      label: 'Invoice',
+      shortLabel: 'INV',
+      desc: '50+ fields · amounts, line items, bank details',
+      icon: '🧾',
+      color: 'amber',
+    },
+    {
+      id: 'packing_list',
+      label: 'Packing List',
+      shortLabel: 'PL',
+      desc: '33+ fields · weight, CBM, cartons per lot',
+      icon: '📦',
+      color: 'green',
+    },
+    {
+      id: 'form_d',
+      label: 'Form D',
+      shortLabel: 'FORM',
+      desc: '26 fields · ATIGA C/O, origin criterion',
+      icon: '📋',
+      color: 'violet',
+    },
   ]
+
+  const colorMap = {
+    blue:   { ring: 'ring-blue-500',   bg: 'bg-blue-500/10',   text: 'text-blue-300',   badge: 'bg-blue-500/20 text-blue-300' },
+    amber:  { ring: 'ring-amber-500',  bg: 'bg-amber-500/10',  text: 'text-amber-300',  badge: 'bg-amber-500/20 text-amber-300' },
+    green:  { ring: 'ring-green-500',  bg: 'bg-green-500/10',  text: 'text-green-300',  badge: 'bg-green-500/20 text-green-300' },
+    violet: { ring: 'ring-violet-500', bg: 'bg-violet-500/10', text: 'text-violet-300', badge: 'bg-violet-500/20 text-violet-300' },
+  }
 
   return (
     <div className={`card ${className}`}>
@@ -176,38 +212,42 @@ export default function WorkflowStatusTracker({
 
       {expanded && (
         <div className="mt-5 space-y-5 animate-fade-in">
-          {/* Workflow Selector */}
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-slate-400 mb-1.5 block">AI Analysis Model</label>
-              <select
-                value={selectedWorkflow}
-                onChange={e => onWorkflowChange?.(e.target.value)}
-                className="input-field text-sm"
-                disabled={workflowStatus !== 'pending'}
-              >
-                {WORKFLOW_OPTIONS.map(opt => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.label} ({opt.est})
-                  </option>
-                ))}
-              </select>
+          {/* Document Type Selector */}
+          <div>
+            <label className="text-xs font-medium text-slate-400 mb-2 block">Document Type</label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {DOC_TYPES.map(dt => {
+                const c = colorMap[dt.color]
+                const isSelected = selectedWorkflow === dt.id
+                const isDisabled = workflowStatus !== 'pending'
+                return (
+                  <button
+                    key={dt.id}
+                    onClick={() => !isDisabled && onWorkflowChange?.(dt.id)}
+                    disabled={isDisabled}
+                    title={dt.desc}
+                    className={`
+                      flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all duration-150 text-center
+                      ${isSelected
+                        ? `${c.ring} ${c.bg} ring-2`
+                        : 'border-slate-700 bg-slate-800/40 hover:border-slate-600 hover:bg-slate-800/70'}
+                      ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                    `}
+                  >
+                    <span className="text-xl leading-none">{dt.icon}</span>
+                    <span className={`text-xs font-bold leading-none ${isSelected ? c.text : 'text-slate-300'}`}>
+                      {dt.shortLabel}
+                    </span>
+                    <span className="text-[10px] text-slate-500 leading-tight hidden sm:block">{dt.label}</span>
+                  </button>
+                )
+              })}
             </div>
-            <div className="flex items-end">
-              <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                <div
-                  onClick={() => onAutoCompareChange?.(!autoCompare)}
-                  className={`w-10 h-5 rounded-full transition-all duration-200 relative cursor-pointer ${
-                    autoCompare ? 'bg-brand-600' : 'bg-slate-700'
-                  }`}
-                >
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${
-                    autoCompare ? 'left-5' : 'left-0.5'
-                  }`} />
-                </div>
-                <span className="text-sm text-slate-300">Auto-compare on completion</span>
-              </label>
-            </div>
+            {selectedWorkflow && (
+              <p className="mt-2 text-xs text-slate-500">
+                {DOC_TYPES.find(d => d.id === selectedWorkflow)?.desc}
+              </p>
+            )}
           </div>
 
           {/* Timeline */}

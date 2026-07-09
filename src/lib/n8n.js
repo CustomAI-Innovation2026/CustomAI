@@ -14,7 +14,7 @@ export async function triggerOcrWorkflow(payload) {
       documentId: payload.documentId,
       fileUrl: payload.fileUrl,
       fileName: payload.fileName,
-      workflowType: payload.workflowType || 'invoice_ocr',
+      workflowType: payload.workflowType || 'bill_of_lading',
       runId: payload.runId,
       callbackUrl: `${window.location.origin}/api/ocr-callback`,
       timestamp: new Date().toISOString(),
@@ -66,25 +66,32 @@ export async function pollWorkflowStatus(runId, maxAttempts = 60, intervalMs = 3
 }
 
 export const WORKFLOW_TYPES = {
-  INVOICE_OCR: {
-    id: 'invoice_ocr',
-    label: 'Invoice & Receipt OCR',
-    description: 'Extract vendor, amount, tax, line items',
+  BILL_OF_LADING: {
+    id: 'bill_of_lading',
+    label: 'Bill of Lading',
+    description: 'BL#, containers, cargo, parties — 46 fields',
+    icon: '🚢',
+    estimatedSeconds: 20,
+  },
+  INVOICE: {
+    id: 'invoice',
+    label: 'Invoice',
+    description: 'Amounts, line items, bank details — 50+ fields',
     icon: '🧾',
+    estimatedSeconds: 20,
+  },
+  PACKING_LIST: {
+    id: 'packing_list',
+    label: 'Packing List',
+    description: 'Weight, CBM, cartons per lot — 33+ fields',
+    icon: '📦',
     estimatedSeconds: 15,
   },
-  ADVANCED_LLM: {
-    id: 'advanced_llm',
-    label: 'Advanced LLM Layout Analysis',
-    description: 'Deep structure extraction with GPT-4o vision',
-    icon: '🤖',
-    estimatedSeconds: 30,
-  },
-  DOCUMENT_COMPARISON: {
-    id: 'document_comparison',
-    label: 'Document Comparison',
-    description: 'Compare two documents for differences',
-    icon: '🔍',
-    estimatedSeconds: 25,
+  FORM_D: {
+    id: 'form_d',
+    label: 'Form D',
+    description: 'ATIGA C/O, origin criterion — 26 fields',
+    icon: '📋',
+    estimatedSeconds: 15,
   },
 }

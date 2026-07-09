@@ -32,7 +32,7 @@ export default function UploadPage() {
   const [dragOver, setDragOver] = useState(false)
   const [error, setError] = useState(null)
   const [workflowStatus, setWorkflowStatus] = useState('pending')
-  const [workflowType, setWorkflowType] = useState('invoice_ocr')
+  const [workflowType, setWorkflowType] = useState('bill_of_lading')
   const [autoCompare, setAutoCompare] = useState(false)
   const [workflowError, setWorkflowError] = useState(null)
   const [workflowErrorId, setWorkflowErrorId] = useState(null)
@@ -168,7 +168,7 @@ export default function UploadPage() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-white mb-1">New Document Scan</h1>
-        <p className="text-slate-400">Upload an invoice or receipt to extract structured data with AI.</p>
+        <p className="text-slate-400">Select document type, upload your file, and let AI extract structured data.</p>
       </div>
 
       <div className="space-y-5">
