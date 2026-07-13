@@ -160,14 +160,27 @@
   border-color: #b0bbc8 !important;
   box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.05) !important;
 }
+/* Light theme button overrides */
+[data-theme="light"] .btn-primary {
+  background: linear-gradient(135deg, #1a7fe8 0%, #0063cc 50%, #0052a3 100%) !important;
+  box-shadow: 0 4px 16px rgba(0,99,204,0.35), 0 1px 3px rgba(0,0,0,0.12) !important;
+  color: #ffffff !important;
+}
+[data-theme="light"] .btn-primary:hover {
+  background: linear-gradient(135deg, #3b96f5 0%, #1a7fe8 50%, #0063cc 100%) !important;
+  box-shadow: 0 6px 22px rgba(0,99,204,0.45), 0 2px 6px rgba(0,0,0,0.14) !important;
+  color: #ffffff !important;
+}
 [data-theme="light"] .btn-secondary {
-  background-color: #f1f5f9 !important;
-  border-color: #b0bbc8 !important;
-  color: #1f2937 !important;
+  background-color: #ffffff !important;
+  border: 1.5px solid #b8cfe8 !important;
+  color: #0a2a52 !important;
+  box-shadow: 0 1px 4px rgba(0,82,163,0.10) !important;
 }
 [data-theme="light"] .btn-secondary:hover {
-  background-color: #e2e8f0 !important;
-  border-color: #9ba8b5 !important;
+  background-color: #edf4fd !important;
+  border-color: #7aaad8 !important;
+  color: #0052a3 !important;
 }
 [data-theme="light"] .input-field {
   background-color: #ffffff !important;

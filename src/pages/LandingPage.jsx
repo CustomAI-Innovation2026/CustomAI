@@ -70,9 +70,12 @@ export default function LandingPage() {
   const isLight = theme === 'light'
 
   return (
-    <div className="min-h-screen gradient-mesh font-sans">
+    <div data-theme={theme} className="min-h-screen gradient-mesh font-sans">
       {/* Navbar */}
-      <header className="fixed top-0 inset-x-0 z-50 border-b border-white/5 bg-slate-950/80 backdrop-blur-xl">
+      <header className={`fixed top-0 inset-x-0 z-50 border-b backdrop-blur-xl transition-colors duration-200
+        ${isLight
+          ? 'border-slate-200/80 bg-white/85'
+          : 'border-white/5 bg-slate-950/80'}`}>
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img
@@ -82,10 +85,11 @@ export default function LandingPage() {
             />
           </div>
 
-          <nav className="hidden md:flex items-center gap-8 text-sm text-slate-400">
-            <a href="#features" className="hover:text-white transition-colors">Features</a>
-            <a href="#how-it-works" className="hover:text-white transition-colors">How it works</a>
-            <a href="#stats" className="hover:text-white transition-colors">Stats</a>
+          <nav className={`hidden md:flex items-center gap-8 text-sm transition-colors duration-200
+            ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+            <a href="#features" className={`transition-colors ${isLight ? 'hover:text-brand-700' : 'hover:text-white'}`}>Features</a>
+            <a href="#how-it-works" className={`transition-colors ${isLight ? 'hover:text-brand-700' : 'hover:text-white'}`}>How it works</a>
+            <a href="#stats" className={`transition-colors ${isLight ? 'hover:text-brand-700' : 'hover:text-white'}`}>Stats</a>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -94,7 +98,7 @@ export default function LandingPage() {
               title={isLight ? 'Switch to Dark' : 'Switch to Light'}
               className={`p-2 rounded-lg transition-all duration-200
                 ${isLight
-                  ? 'bg-slate-100 hover:bg-slate-200 text-amber-500'
+                  ? 'bg-slate-100 hover:bg-blue-50 text-amber-500 border border-slate-200'
                   : 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-amber-400'}`}
             >
               {isLight ? <Sun size={16} /> : <Moon size={16} />}
@@ -103,7 +107,10 @@ export default function LandingPage() {
               href="https://github.com/wallapsu-data/CustomAI"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
+              className={`flex items-center gap-2 text-sm transition-colors
+                ${isLight
+                  ? 'text-slate-500 hover:text-brand-700'
+                  : 'text-slate-400 hover:text-white'}`}
             >
               <Github size={16} />
               <span className="hidden sm:inline">GitHub</span>
