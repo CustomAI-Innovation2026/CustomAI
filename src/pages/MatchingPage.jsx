@@ -385,10 +385,10 @@ function buildUnifiedFields(types, docDataMap) {
 }
 
 // Build per-docType value table from n8n pair results (uses Gemini-analyzed values)
-function buildMultiDocTableFromPairs(pairs, comboTypes) {
+function buildMultiDocTableFromPairs(pairs, comboTypes, fileIdx = 0) {
   const fieldMap = {}
   ;(pairs || []).forEach(pair => {
-    const fp = pair?.filePairs?.[0]
+    const fp = pair?.filePairs?.[fileIdx] ?? pair?.filePairs?.[0]
     if (!fp) return
     fp.fields.forEach(f => {
       const key = f.field
@@ -1730,6 +1730,7 @@ export default function MatchingPage() {
                   const isGroupActive = (gi) => activeGroupIdx === gi
                   const isPairActive  = (pi) => activePairIdx === pi && activeGroupIdx === null
                   return (
+                    <>
                     <div className="flex flex-wrap gap-1 mb-2">
                       {/* ALL tab */}
                       {showAll && (
@@ -1760,7 +1761,7 @@ export default function MatchingPage() {
                       ))}
                       {/* Pair tabs */}
                       {matchResults.map((pair, i) => {
-                        const fp = pair.filePairs[0]
+                        const fp = pair.filePairs[activeFileIdx] ?? pair.filePairs[0]
                         const pct = fp?.summary.pct ?? 0
                         const pctColor = pct >= 80 ? 'text-green-400' : pct >= 50 ? 'text-amber-400' : 'text-red-400'
                         return (
@@ -1783,6 +1784,43 @@ export default function MatchingPage() {
                         )
                       })}
                     </div>
+
+                    {/* File-pair sub-tabs — shown when there are multiple file pairs */}
+                    {(() => {
+                      const maxFP = Math.max(...matchResults.map(p => p.filePairs?.length ?? 1))
+                      if (maxFP <= 1) return null
+                      // Use first pair to derive labels (rightDoc names)
+                      const refPair = matchResults.find(p => p.filePairs?.length > 1) ?? matchResults[0]
+                      return (
+                        <div className={`flex items-center gap-1.5 px-1 py-2 border-t flex-wrap ${isLight ? 'border-slate-200' : 'border-slate-800'}`}>
+                          <span className={`text-[10px] font-semibold uppercase tracking-wider flex-shrink-0 mr-1 ${subCls}`}>คู่เอกสาร:</span>
+                          {refPair.filePairs.map((fp2, fi) => {
+                            const pct = fp2.summary?.pct ?? 0
+                            const pctColor = pct >= 70 ? 'text-green-400' : pct >= 40 ? 'text-amber-400' : 'text-red-400'
+                            const label = fp2.rightDoc?.replace(/\.[^.]+$/, '').replace(/^\(R\)/, '').trim() ?? `Pair ${fi + 1}`
+                            const shortLabel = label.length > 20 ? label.slice(0, 20) + '…' : label
+                            const isActive = fi === activeFileIdx
+                            return (
+                              <button
+                                key={fi}
+                                onClick={() => setActiveFileIdx(fi)}
+                                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium transition-all flex-shrink-0 ${
+                                  isActive
+                                    ? 'bg-brand-600 text-white shadow-sm'
+                                    : isLight
+                                      ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                                }`}
+                              >
+                                <span className="max-w-[140px] truncate">{shortLabel}</span>
+                                <span className={`font-bold ${isActive ? 'text-white/80' : pctColor}`}>{pct}%</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )
+                    })()}
+                    </>
                   )
                 })()}
 
@@ -1800,7 +1838,7 @@ export default function MatchingPage() {
                       multiTypes.includes(pr.leftType) && multiTypes.includes(pr.rightType)
                     )
                     const statsFields = relevantPairs.length > 0
-                      ? buildMultiDocTableFromPairs(relevantPairs, multiTypes)
+                      ? buildMultiDocTableFromPairs(relevantPairs, multiTypes, activeFileIdx)
                       : buildUnifiedFields(multiTypes, docDataMap)
                     const { tot, ok, mm, ms, rate } = computeStats(statsFields)
                     const colDefs = multiTypes.map(t => {
@@ -1815,7 +1853,7 @@ export default function MatchingPage() {
                     )
                   }
                   // Pair view
-                  const _fp0 = matchResults[activePairIdx]?.filePairs?.[0]
+                  const _fp0 = matchResults[activePairIdx]?.filePairs?.[activeFileIdx] ?? matchResults[activePairIdx]?.filePairs?.[0]
                   const pair = matchResults[activePairIdx]
                   if (!_fp0 || !pair) return null
                   const fp = { ..._fp0, fields: applyFuzzyToFields(_fp0.fields || []) }
@@ -1850,7 +1888,7 @@ export default function MatchingPage() {
                   const relevantPairs = (matchResults || []).filter(pr =>
                     multiTypes.includes(pr.leftType) && multiTypes.includes(pr.rightType)
                   )
-                  const tableFields = buildMultiDocTableFromPairs(relevantPairs, multiTypes)
+                  const tableFields = buildMultiDocTableFromPairs(relevantPairs, multiTypes, activeFileIdx)
                   const colDefs = multiTypes.map(t => {
                     const dt = DOC_TYPES.find(d => d.id === t)
                     return { key: t, label: dt?.short ?? t, emoji: dt?.emoji }
@@ -1863,7 +1901,7 @@ export default function MatchingPage() {
                 }
 
                 // ── Pair view (2-column) — TABLE ──
-                const _fpRaw = matchResults[activePairIdx]?.filePairs?.[0]
+                const _fpRaw = matchResults[activePairIdx]?.filePairs?.[activeFileIdx] ?? matchResults[activePairIdx]?.filePairs?.[0]
                 if (!_fpRaw) return null
                 const pair = matchResults[activePairIdx]
                 const fuzzyPairFields = applyFuzzyToFields(_fpRaw.fields || [])
