@@ -233,8 +233,17 @@
     box-shadow: 0 6px 24px rgba(0,82,163,0.50), 0 0 0 1px rgba(244,121,32,0.25);
   }
   .btn-secondary {
-    @apply bg-white/10 hover:bg-white/15 text-white font-medium px-6 py-3 rounded-xl
-           border border-white/20 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98];
+    @apply font-medium px-6 py-3 rounded-xl
+           transition-all duration-200 hover:scale-[1.02] active:scale-[0.98];
+    background: rgba(30,60,110,0.70);
+    border: 1.5px solid rgba(100,150,220,0.45);
+    color: #c8deff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  }
+  .btn-secondary:hover {
+    background: rgba(40,80,150,0.80);
+    border-color: rgba(130,180,255,0.65);
+    color: #e8f2ff;
   }
   .card        { @apply bg-slate-900 border border-slate-800 rounded-2xl p-6; }
   .input-field {

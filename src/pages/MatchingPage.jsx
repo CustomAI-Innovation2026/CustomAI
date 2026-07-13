@@ -1490,13 +1490,13 @@ export default function MatchingPage() {
   const activeFilePair = activePair?.filePairs?.[activeFileIdx]
 
   // Styles
-  const card     = `rounded-2xl border ${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900 border-slate-800'}`
+  const card     = `rounded-2xl border ${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900 border-slate-700'}`
   const titleCls = isLight ? 'text-slate-900' : 'text-white'
-  const subCls   = isLight ? 'text-slate-500' : 'text-slate-400'
-  const divider  = isLight ? 'border-slate-100' : 'border-slate-800'
+  const subCls   = isLight ? 'text-slate-500' : 'text-slate-300'
+  const divider  = isLight ? 'border-slate-100' : 'border-slate-700'
   const selectCls = isLight
-    ? 'bg-white border-slate-200 text-slate-700 focus:border-brand-500'
-    : 'bg-slate-800 border-slate-700 text-slate-200 focus:border-brand-500'
+    ? 'bg-white border-slate-300 text-slate-800 focus:border-brand-500'
+    : 'bg-slate-700 border-slate-500 text-slate-100 focus:border-brand-400'
   const selectDisabledCls = isLight
     ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
     : 'bg-slate-800/50 border-slate-700/50 text-slate-600 cursor-not-allowed'
@@ -1746,7 +1746,7 @@ export default function MatchingPage() {
                           className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold transition-all ${
                             isAllActive
                               ? 'bg-violet-600 text-white shadow-sm'
-                              : isLight ? 'bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200' : 'bg-violet-900/30 text-violet-300 hover:bg-violet-800/40 border border-violet-700/40'
+                              : isLight ? 'bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200' : 'bg-violet-800/50 text-violet-200 hover:bg-violet-700/60 border border-violet-500/60'
                           }`}
                         >
                           📊 {comboTypes.map(t => DOC_TYPES.find(d => d.id === t)?.short).join('·')}
@@ -1760,7 +1760,7 @@ export default function MatchingPage() {
                           className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold transition-all ${
                             isGroupActive(gi)
                               ? 'bg-indigo-600 text-white shadow-sm'
-                              : isLight ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200' : 'bg-indigo-900/30 text-indigo-300 hover:bg-indigo-800/40 border border-indigo-700/40'
+                              : isLight ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200' : 'bg-indigo-800/50 text-indigo-200 hover:bg-indigo-700/60 border border-indigo-500/60'
                           }`}
                         >
                           📊 {gTypes.map(t => DOC_TYPES.find(d => d.id === t)?.short).join('·')}
@@ -1778,7 +1778,7 @@ export default function MatchingPage() {
                             className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold transition-all ${
                               isPairActive(i)
                                 ? 'bg-brand-600 text-white shadow-sm'
-                                : isLight ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                                : isLight ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300' : 'bg-slate-700/80 text-slate-100 hover:bg-slate-600 border border-slate-500/70'
                             }`}
                           >
                             {pair.leftEmoji} {pair.label} {pair.rightEmoji}
@@ -1801,15 +1801,15 @@ export default function MatchingPage() {
                       const activePct = activeFP?.summary?.pct ?? 0
                       const pctColor = activePct >= 70 ? 'text-green-400' : activePct >= 40 ? 'text-amber-400' : 'text-red-400'
                       return (
-                        <div className={`flex items-center gap-2 px-1 py-2 border-t ${isLight ? 'border-slate-200' : 'border-slate-800'}`}>
-                          <span className={`text-[10px] font-semibold uppercase tracking-wider flex-shrink-0 ${subCls}`}>คู่เอกสาร:</span>
+                        <div className={`flex items-center gap-2 px-1 py-2 border-t ${isLight ? 'border-slate-200' : 'border-slate-600/60'}`}>
+                          <span className={`text-[10px] font-semibold uppercase tracking-wider flex-shrink-0 ${isLight ? 'text-slate-500' : 'text-slate-300'}`}>คู่เอกสาร:</span>
                           <select
                             value={activeFileIdx}
                             onChange={e => setActiveFileIdx(Number(e.target.value))}
-                            className={`flex-1 text-xs rounded-lg px-2 py-1 border outline-none cursor-pointer ${
+                            className={`flex-1 text-xs font-medium rounded-lg px-2 py-1.5 border outline-none cursor-pointer ${
                               isLight
-                                ? 'bg-white border-slate-300 text-slate-700'
-                                : 'bg-slate-800 border-slate-700 text-slate-200'
+                                ? 'bg-white border-slate-300 text-slate-800'
+                                : 'bg-slate-600 border-slate-400 text-white'
                             }`}
                           >
                             {refPair.filePairs.map((fp2, fi) => {
