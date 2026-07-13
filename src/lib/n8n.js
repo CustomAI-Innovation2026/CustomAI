@@ -1,9 +1,29 @@
-const N8N_WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://n8n.scgjwd.com/webhook/ocr-trigger'
+const N8N_WEBHOOK_URL         = import.meta.env.VITE_N8N_WEBHOOK_URL          || 'https://n8n.scgjwd.com/webhook/ocr-trigger'
+const N8N_MATCHING_WEBHOOK_URL = import.meta.env.VITE_N8N_MATCHING_WEBHOOK_URL || 'https://n8n.scgjwd.com/webhook/document-matching'
 
 /**
  * Trigger the n8n OCR workflow
  * @param {object} payload - { documentId, fileUrl, fileName, workflowType, runId }
  */
+/**
+ * Trigger the AI document matching workflow
+ * @param {Array} panels - [{ docType, files: [{ fileName, data }] }]
+ * @returns {Promise<{ success, pairs, aiEnhanced, completedAt }>}
+ */
+export async function triggerMatchingWorkflow(panels) {
+  const response = await fetch(N8N_MATCHING_WEBHOOK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ panels, requestedAt: new Date().toISOString() }),
+    signal: AbortSignal.timeout(180000),
+  })
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Matching workflow failed: ${response.status} – ${text}`)
+  }
+  return response.json()
+}
+
 export async function triggerOcrWorkflow(payload) {
   const response = await fetch(N8N_WEBHOOK_URL, {
     method: 'POST',

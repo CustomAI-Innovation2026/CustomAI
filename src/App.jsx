@@ -5,19 +5,18 @@ import UploadPage from './pages/UploadPage.jsx'
 import ResultsPage from './pages/ResultsPage.jsx'
 import HistoryPage from './pages/HistoryPage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
+import MatchingPage from './pages/MatchingPage.jsx'
 
 export default function App() {
   return (
     <Routes>
-      {/* Public landing page */}
       <Route path="/" element={<LandingPage />} />
-
-      {/* App routes with sidebar layout */}
       <Route path="/app" element={<AppLayout />}>
         <Route index element={<DashboardPage />} />
-        <Route path="upload" element={<UploadPage />} />
+        <Route path="upload"   element={<UploadPage />} />
+        <Route path="matching" element={<MatchingPage />} />
         <Route path="results/:documentId" element={<ResultsPage />} />
-        <Route path="history" element={<HistoryPage />} />
+        <Route path="history"  element={<HistoryPage />} />
       </Route>
     </Routes>
   )

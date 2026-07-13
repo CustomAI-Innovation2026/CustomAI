@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom'
 import {
   Zap, FileText, Brain, Database, ArrowRight, CheckCircle,
-  Upload, Cpu, BarChart3, Shield, Clock, Star, ChevronRight, Github
+  Upload, Cpu, BarChart3, Shield, Clock, Star, ChevronRight, Github, Sun, Moon
 } from 'lucide-react'
+import { useTheme } from '../lib/theme.jsx'
 
 const FEATURES = [
   {
@@ -65,6 +66,8 @@ const STATS = [
 
 export default function LandingPage() {
   const navigate = useNavigate()
+  const { theme, toggle } = useTheme()
+  const isLight = theme === 'light'
 
   return (
     <div className="min-h-screen gradient-mesh font-sans">
@@ -85,6 +88,16 @@ export default function LandingPage() {
           </nav>
 
           <div className="flex items-center gap-3">
+            <button
+              onClick={toggle}
+              title={isLight ? 'Switch to Dark' : 'Switch to Light'}
+              className={`p-2 rounded-lg transition-all duration-200
+                ${isLight
+                  ? 'bg-slate-100 hover:bg-slate-200 text-amber-500'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-amber-400'}`}
+            >
+              {isLight ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
             <a
               href="https://github.com/wallapsu-data/CustomAI"
               target="_blank"
