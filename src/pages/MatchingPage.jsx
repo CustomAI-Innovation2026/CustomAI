@@ -966,7 +966,12 @@ function DetailsModal({ pairResults, panels, selectedCombo, isLight, onClose }) 
   const surf2    = isLight ? 'bg-slate-50'  : 'bg-slate-800/50'
 
   const pair = (activePair >= 0) ? pairResults[activePair] : null
-  const _fp  = pair?.filePairs?.[0]
+  const [activeFileIdx, setActiveFileIdx] = useState(0)
+  // Reset file index when switching pair tabs
+  const prevPairRef = React.useRef(activePair)
+  if (prevPairRef.current !== activePair) { prevPairRef.current = activePair; if (activeFileIdx !== 0) setActiveFileIdx(0) }
+
+  const _fp  = pair?.filePairs?.[activeFileIdx] ?? pair?.filePairs?.[0]
   const fp   = _fp ? { ..._fp, fields: applyFuzzyToFields(_fp.fields) } : undefined
 
   const sectionedFields = fp
@@ -1059,6 +1064,34 @@ function DetailsModal({ pairResults, panels, selectedCombo, isLight, onClose }) 
           ))}
         </div>
 
+        {/* File-pair sub-tabs — shown when a pair has multiple file pairs */}
+        {activePair >= 0 && pair?.filePairs?.length > 1 && (
+          <div className={`flex items-center gap-2 px-6 py-2 border-b flex-shrink-0 overflow-x-auto ${divider}`}
+            style={{ scrollbarWidth: 'thin' }}>
+            <span className={`text-[10px] font-semibold uppercase tracking-wider flex-shrink-0 ${subCls}`}>File pair:</span>
+            {pair.filePairs.map((fp2, fi) => {
+              const pct = fp2.summary?.pct ?? 0
+              const isActive = fi === activeFileIdx
+              return (
+                <button
+                  key={fi}
+                  onClick={() => setActiveFileIdx(fi)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all flex-shrink-0 ${
+                    isActive
+                      ? 'bg-brand-600 text-white'
+                      : isLight ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                  }`}
+                >
+                  <span className="max-w-[120px] truncate">{fp2.rightDoc ?? fp2.leftDoc}</span>
+                  <span className={`text-[10px] font-bold px-1 rounded ${isActive ? 'bg-white/20' : pct >= 70 ? 'text-green-400' : pct >= 40 ? 'text-amber-400' : 'text-red-400'}`}>
+                    {pct}%
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
         {/* Legend — only for pair view */}
         {activePair >= 0 && (
           <div className={`flex items-center gap-4 px-6 py-2 border-b flex-shrink-0 ${divider} ${surf2}`}>
@@ -1073,7 +1106,7 @@ function DetailsModal({ pairResults, panels, selectedCombo, isLight, onClose }) 
               <span className={`text-[10px] ${subCls}`}>Left:</span>
               <span className={`text-[10px] font-bold ${titleCls}`}>{pair?.leftEmoji} {pair?.label?.split(' vs ')[0]}</span>
               <span className={`text-[10px] mx-1 ${subCls}`}>Right:</span>
-              <span className={`text-[10px] font-bold ${titleCls}`}>{pair?.rightEmoji} {pair?.label?.split(' vs ')[1]}</span>
+              <span className={`text-[10px] font-bold ${titleCls}`}>{fp?.rightDoc ?? pair?.label?.split(' vs ')[1]}</span>
             </div>
           </div>
         )}
@@ -1422,7 +1455,7 @@ export default function MatchingPage() {
           ? Math.round(allFilePairs.reduce((s, fp) => s + (fp.summary?.pct ?? 0), 0) / allFilePairs.length)
           : 0
 
-        saveMatchingHistory({
+        await saveMatchingHistory({
           comboLabel: selectedCombo?.label ?? '',
           comboTypes: selectedCombo?.types ?? [],
           fileNames: freshFileNamesMap,

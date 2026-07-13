@@ -146,22 +146,27 @@ function MatchingHistoryTab({ search }) {
   const navigate = useNavigate()
   const [entries, setEntries] = useState([])
 
-  useEffect(() => { setEntries(getMatchingHistory()) }, [])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    getMatchingHistory().then(data => { setEntries(data); setLoading(false) })
+  }, [])
 
   const filtered = entries.filter(e =>
     e.comboLabel?.toLowerCase().includes(search.toLowerCase()) ||
     Object.values(e.fileNames ?? {}).flat().some(n => n.toLowerCase().includes(search.toLowerCase()))
   )
 
-  function handleDelete(e, id) {
+  async function handleDelete(e, id) {
     e.stopPropagation()
-    deleteMatchingHistoryEntry(id)
+    await deleteMatchingHistoryEntry(id)
     setEntries(prev => prev.filter(en => en.id !== id))
   }
 
-  function handleClearAll() {
+  async function handleClearAll() {
     if (!confirm('Clear all matching history?')) return
-    clearMatchingHistory()
+    await clearMatchingHistory()
     setEntries([])
   }
 
@@ -176,6 +181,13 @@ function MatchingHistoryTab({ search }) {
       },
     })
   }
+
+  if (loading) return (
+    <div className="text-center py-20">
+      <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+      <p className="text-slate-400 text-sm">Loading history from cloud…</p>
+    </div>
+  )
 
   if (filtered.length === 0) return (
     <div className="text-center py-20">
@@ -264,7 +276,7 @@ export default function HistoryPage() {
   const [matchCount, setMatchCount] = useState(0)
 
   useEffect(() => {
-    setMatchCount(getMatchingHistory().length)
+    getMatchingHistory().then(data => setMatchCount(data.length))
   }, [tab])
 
   return (
