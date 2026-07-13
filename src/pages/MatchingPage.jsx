@@ -1349,7 +1349,7 @@ export default function MatchingPage() {
         if (filePairs.length > 0) {
           const LDT = DOC_TYPES.find(d => d.id === LP.docType)
           const RDT = DOC_TYPES.find(d => d.id === RP.docType)
-          pairResults.push({ label: `${LDT?.short || 'L'} vs ${RDT?.short || 'R'}`, leftEmoji: LDT?.emoji || '📄', rightEmoji: RDT?.emoji || '📄', filePairs })
+          pairResults.push({ label: `${LDT?.short || 'L'} vs ${RDT?.short || 'R'}`, leftEmoji: LDT?.emoji || '📄', rightEmoji: RDT?.emoji || '📄', leftType: LP.docType, rightType: RP.docType, filePairs })
         }
       }
     }
@@ -1812,12 +1812,24 @@ export default function MatchingPage() {
                                 : 'bg-slate-600 border-slate-400 text-white'
                             }`}
                           >
-                            {refPair.filePairs.map((fp2, fi) => {
-                              const pct = fp2.summary?.pct ?? 0
-                              const label = fp2.rightDoc?.replace(/\.[^.]+$/, '').replace(/^\(R\)/, '').trim() ?? `Pair ${fi + 1}`
+                            {Array.from({ length: maxFP }, (_, fi) => {
+                              // Collect unique filenames across all panel pairs at this index
+                              const seen = new Set()
+                              const docs = []
+                              matchResults.forEach(pr => {
+                                const fp = pr.filePairs?.[fi]
+                                if (!fp) return
+                                for (const name of [fp.leftDoc, fp.rightDoc]) {
+                                  if (name && name !== '—' && !seen.has(name)) {
+                                    seen.add(name)
+                                    docs.push(name)
+                                  }
+                                }
+                              })
+                              const pct = refPair.filePairs?.[fi]?.summary?.pct ?? 0
                               return (
                                 <option key={fi} value={fi}>
-                                  {`${fi + 1}. ${label} — ${pct}%`}
+                                  {`คู่ ${fi + 1}: ${docs.join(' vs ')} — ${pct}%`}
                                 </option>
                               )
                             })}
