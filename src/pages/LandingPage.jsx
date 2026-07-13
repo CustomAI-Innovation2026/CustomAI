@@ -75,10 +75,11 @@ export default function LandingPage() {
       <header className="fixed top-0 inset-x-0 z-50 border-b border-white/5 bg-slate-950/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center shadow-lg shadow-brand-900/50">
-              <Zap size={16} className="text-white" />
-            </div>
-            <span className="font-bold text-white">DocScan AI</span>
+            <img
+              src={isLight ? '/CustomAI/logo-blue.webp' : '/CustomAI/logo-white.png'}
+              alt="SCGJWD Logo"
+              className="h-8 w-auto object-contain"
+            />
           </div>
 
           <nav className="hidden md:flex items-center gap-8 text-sm text-slate-400">
