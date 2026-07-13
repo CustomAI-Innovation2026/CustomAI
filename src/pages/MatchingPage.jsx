@@ -227,8 +227,15 @@ function containerListMatch(a, b) {
   const split = s => String(s).split(/[\s,;\/]+/).map(x => x.trim().toLowerCase()).filter(Boolean)
   const listA = split(a)
   const listB = split(b)
-  // any element of listA matches any element of listB
   return listA.some(x => listB.some(y => x === y || x.includes(y) || y.includes(x)))
+}
+// Multi-doc container: each doc's containers must appear in the document with the largest list (BL)
+function containerSetMatch(vals) {
+  const split = s => String(s).split(/[\s,;\/]+/).map(x => x.trim().toLowerCase()).filter(Boolean)
+  const lists = vals.map(split)
+  const largest = lists.reduce((a, b) => a.length >= b.length ? a : b)
+  const largeSet = new Set(largest)
+  return lists.every(l => l.length === 0 || l.some(c => largeSet.has(c) || [...largeSet].some(x => x.includes(c) || c.includes(x))))
 }
 
 // Reference/ID match: "760243297[380K]" == "(760243297(380K))" == "760243297"
@@ -299,7 +306,7 @@ function computeStatus(fieldKey, rawVals) {
 
   // 2. Container: BL may list multiple — check any element matches
   if (type === 'container') {
-    return allPairs(present, (a, b) => containerListMatch(a, b)) ? 'fuzzy_match' : 'mismatch'
+    return containerSetMatch(present) ? 'fuzzy_match' : 'mismatch'
   }
   // 3. Reference/ID: strip brackets, compare core number
   if (type === 'reference') {
@@ -1785,38 +1792,37 @@ export default function MatchingPage() {
                       })}
                     </div>
 
-                    {/* File-pair sub-tabs — shown when there are multiple file pairs */}
+                    {/* File-pair dropdown — shown when there are multiple file pairs */}
                     {(() => {
                       const maxFP = Math.max(...matchResults.map(p => p.filePairs?.length ?? 1))
                       if (maxFP <= 1) return null
-                      // Use first pair to derive labels (rightDoc names)
                       const refPair = matchResults.find(p => p.filePairs?.length > 1) ?? matchResults[0]
+                      const activeFP = refPair.filePairs[activeFileIdx] ?? refPair.filePairs[0]
+                      const activePct = activeFP?.summary?.pct ?? 0
+                      const pctColor = activePct >= 70 ? 'text-green-400' : activePct >= 40 ? 'text-amber-400' : 'text-red-400'
                       return (
-                        <div className={`flex items-center gap-1.5 px-1 py-2 border-t flex-wrap ${isLight ? 'border-slate-200' : 'border-slate-800'}`}>
-                          <span className={`text-[10px] font-semibold uppercase tracking-wider flex-shrink-0 mr-1 ${subCls}`}>คู่เอกสาร:</span>
-                          {refPair.filePairs.map((fp2, fi) => {
-                            const pct = fp2.summary?.pct ?? 0
-                            const pctColor = pct >= 70 ? 'text-green-400' : pct >= 40 ? 'text-amber-400' : 'text-red-400'
-                            const label = fp2.rightDoc?.replace(/\.[^.]+$/, '').replace(/^\(R\)/, '').trim() ?? `Pair ${fi + 1}`
-                            const shortLabel = label.length > 20 ? label.slice(0, 20) + '…' : label
-                            const isActive = fi === activeFileIdx
-                            return (
-                              <button
-                                key={fi}
-                                onClick={() => setActiveFileIdx(fi)}
-                                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium transition-all flex-shrink-0 ${
-                                  isActive
-                                    ? 'bg-brand-600 text-white shadow-sm'
-                                    : isLight
-                                      ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                                }`}
-                              >
-                                <span className="max-w-[140px] truncate">{shortLabel}</span>
-                                <span className={`font-bold ${isActive ? 'text-white/80' : pctColor}`}>{pct}%</span>
-                              </button>
-                            )
-                          })}
+                        <div className={`flex items-center gap-2 px-1 py-2 border-t ${isLight ? 'border-slate-200' : 'border-slate-800'}`}>
+                          <span className={`text-[10px] font-semibold uppercase tracking-wider flex-shrink-0 ${subCls}`}>คู่เอกสาร:</span>
+                          <select
+                            value={activeFileIdx}
+                            onChange={e => setActiveFileIdx(Number(e.target.value))}
+                            className={`flex-1 text-xs rounded-lg px-2 py-1 border outline-none cursor-pointer ${
+                              isLight
+                                ? 'bg-white border-slate-300 text-slate-700'
+                                : 'bg-slate-800 border-slate-700 text-slate-200'
+                            }`}
+                          >
+                            {refPair.filePairs.map((fp2, fi) => {
+                              const pct = fp2.summary?.pct ?? 0
+                              const label = fp2.rightDoc?.replace(/\.[^.]+$/, '').replace(/^\(R\)/, '').trim() ?? `Pair ${fi + 1}`
+                              return (
+                                <option key={fi} value={fi}>
+                                  {`${fi + 1}. ${label} — ${pct}%`}
+                                </option>
+                              )
+                            })}
+                          </select>
+                          <span className={`text-xs font-bold flex-shrink-0 ${pctColor}`}>{activePct}%</span>
                         </div>
                       )
                     })()}
