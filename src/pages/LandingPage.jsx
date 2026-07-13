@@ -120,14 +120,15 @@ export default function LandingPage() {
 
       {/* Hero */}
       <section className="pt-40 pb-32 px-6 text-center relative overflow-hidden">
-        {/* Decorative glow */}
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-brand-600/10 blur-3xl pointer-events-none" />
+        {/* Decorative glows */}
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[600px] h-[500px] rounded-full bg-brand-600/15 blur-3xl pointer-events-none" />
+        <div className="absolute top-32 right-[15%] w-[280px] h-[280px] rounded-full bg-orange-500/20 blur-3xl pointer-events-none" />
 
         <div className="relative max-w-4xl mx-auto">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 glass rounded-full px-4 py-2 text-sm text-slate-300 mb-8 animate-fade-in">
-            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-            Powered by GPT-4o Vision + n8n Automation
+          <div className="inline-flex items-center gap-2 glass rounded-full px-4 py-2 text-sm text-slate-300 mb-8 animate-fade-in border border-orange-500/20">
+            <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
+            Powered by Gemini Vision + n8n Automation
           </div>
 
           {/* Headline */}
