@@ -34,6 +34,7 @@ jobs:
           echo "VITE_SUPABASE_URL=https://yhpxqnkcltdocwqrcbcv.supabase.co" > .env
           echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}" >> .env
           echo "VITE_N8N_WEBHOOK_URL=https://n8n.scgjwd.com/webhook/ocr-trigger" >> .env
+          echo "VITE_N8N_MATCHING_WEBHOOK_URL=https://n8n.scgjwd.com/webhook/document-matching" >> .env
           echo "VITE_APP_NAME=DocScan AI" >> .env
 
       - name: Build
