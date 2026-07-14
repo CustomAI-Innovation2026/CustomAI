@@ -162,13 +162,13 @@
 }
 /* Light theme button overrides */
 [data-theme="light"] .btn-primary {
-  background: linear-gradient(135deg, #1a7fe8 0%, #0063cc 50%, #0052a3 100%) !important;
-  box-shadow: 0 4px 16px rgba(0,99,204,0.35), 0 1px 3px rgba(0,0,0,0.12) !important;
+  background: linear-gradient(135deg, #2e8ef7 0%, #0069d9 50%, #0055bb 100%) !important;
+  box-shadow: 0 4px 18px rgba(0,105,217,0.40), 0 1px 3px rgba(0,0,0,0.12) !important;
   color: #ffffff !important;
 }
 [data-theme="light"] .btn-primary:hover {
-  background: linear-gradient(135deg, #3b96f5 0%, #1a7fe8 50%, #0063cc 100%) !important;
-  box-shadow: 0 6px 22px rgba(0,99,204,0.45), 0 2px 6px rgba(0,0,0,0.14) !important;
+  background: linear-gradient(135deg, #50a5ff 0%, #2e8ef7 50%, #0069d9 100%) !important;
+  box-shadow: 0 6px 24px rgba(0,105,217,0.55), 0 2px 6px rgba(0,0,0,0.14) !important;
   color: #ffffff !important;
 }
 [data-theme="light"] .btn-secondary {
@@ -225,12 +225,12 @@
   .btn-primary {
     @apply text-white font-semibold px-6 py-3 rounded-xl
            transition-all duration-200 hover:scale-[1.02] active:scale-[0.98];
-    background: linear-gradient(135deg, #0066cc 0%, #0052a3 60%, #003d7a 100%);
-    box-shadow: 0 4px 20px rgba(0,82,163,0.40), 0 0 0 1px rgba(244,121,32,0.15);
+    background: linear-gradient(135deg, #3b9eff 0%, #0077ee 50%, #0055bb 100%);
+    box-shadow: 0 4px 20px rgba(0,119,238,0.45), 0 0 0 1px rgba(244,121,32,0.20);
   }
   .btn-primary:hover {
-    background: linear-gradient(135deg, #3385d6 0%, #0066cc 60%, #0052a3 100%);
-    box-shadow: 0 6px 24px rgba(0,82,163,0.50), 0 0 0 1px rgba(244,121,32,0.25);
+    background: linear-gradient(135deg, #60b3ff 0%, #3b9eff 50%, #0077ee 100%);
+    box-shadow: 0 6px 26px rgba(0,119,238,0.60), 0 0 0 1px rgba(244,121,32,0.30);
   }
   .btn-secondary {
     @apply font-medium px-6 py-3 rounded-xl

@@ -63,10 +63,10 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-          <StatCard icon={FileText}     label="Total Documents"  value={total}     color="bg-brand-600"    subtext="All time" />
-          <StatCard icon={CheckCircle2} label="Completed"        value={completed} color="bg-green-600"    subtext={`${total ? Math.round(completed/total*100) : 0}% success rate`} />
-          <StatCard icon={XCircle}      label="Failed"           value={failed}    color="bg-red-600"      subtext="Retryable" />
-          <StatCard icon={Clock}        label="In Progress"      value={pending}   color="bg-yellow-600"   subtext="Processing" />
+          <StatCard icon={FileText}     label="Total Documents"  value={total}     color="bg-brand-500"    subtext="All time" />
+          <StatCard icon={CheckCircle2} label="Completed"        value={completed} color="bg-green-500"    subtext={`${total ? Math.round(completed/total*100) : 0}% success rate`} />
+          <StatCard icon={XCircle}      label="Failed"           value={failed}    color="bg-red-500"      subtext="Retryable" />
+          <StatCard icon={Clock}        label="In Progress"      value={pending}   color="bg-amber-500"    subtext="Processing" />
         </div>
       )}
 
@@ -140,21 +140,21 @@ export default function DashboardPage() {
                 title: 'Upload Invoice',
                 desc: 'Extract all fields from an invoice or receipt',
                 icon: Upload,
-                color: 'bg-brand-600/20 text-brand-400',
+                color: 'bg-brand-500/30 text-brand-300',
                 action: () => navigate('/app/upload'),
               },
               {
                 title: 'View History',
                 desc: 'Browse all previously processed documents',
                 icon: FileText,
-                color: 'bg-purple-500/20 text-purple-400',
+                color: 'bg-purple-500/30 text-purple-300',
                 action: () => navigate('/app/history'),
               },
               {
                 title: 'Pipeline Stats',
                 desc: 'Monitor n8n workflow execution metrics',
                 icon: TrendingUp,
-                color: 'bg-green-500/20 text-green-400',
+                color: 'bg-green-500/30 text-green-300',
                 action: () => window.open('https://n8n.scgjwd.com', '_blank'),
               },
             ].map(({ title, desc, icon: Icon, color, action }) => (
