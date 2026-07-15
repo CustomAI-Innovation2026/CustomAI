@@ -43,9 +43,9 @@ function formatBytes(bytes) {
 }
 
 function ScorePill({ score }) {
-  const color = score >= 80 ? 'bg-green-500/25 text-green-300 border-green-500/40'
-    : score >= 50 ? 'bg-amber-500/25 text-amber-300 border-amber-500/40'
-    : 'bg-red-500/25 text-red-300 border-red-500/40'
+  const color = score >= 80 ? 'bg-green-500/20 text-green-700 border-green-500/40'
+    : score >= 50 ? 'bg-amber-500/20 text-amber-700 border-amber-500/40'
+    : 'bg-red-500/20 text-red-700 border-red-600/50'
   return (
     <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${color}`}>
       {score}%
@@ -226,20 +226,20 @@ function MatchingHistoryTab({ search }) {
               key={entry.id}
               onClick={() => viewEntry(entry)}
               className="flex items-center gap-4 p-4 rounded-2xl border cursor-pointer
-                bg-amber-500/12 border-amber-500/35
-                hover:bg-amber-500/20 hover:border-amber-400/55
+                bg-white/8 border-slate-700/60
+                hover:bg-white/12 hover:border-slate-600/80
                 transition-all duration-200 group"
             >
               {/* Icon */}
-              <div className="w-10 h-10 rounded-xl bg-amber-500/30 flex items-center justify-center flex-shrink-0">
-                <GitCompare size={18} className="text-amber-300" />
+              <div className="w-10 h-10 rounded-xl bg-slate-700/70 flex items-center justify-center flex-shrink-0">
+                <GitCompare size={18} className="text-slate-300" />
               </div>
 
               {/* Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
                   <p className="font-semibold text-white text-sm truncate">{entry.comboLabel}</p>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/25 text-amber-300 border border-amber-500/40 font-medium flex-shrink-0">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-700/60 text-slate-300 border border-slate-600/50 font-medium flex-shrink-0">
                     {typeLabels}
                   </span>
                 </div>
@@ -259,7 +259,7 @@ function MatchingHistoryTab({ search }) {
                 <Trash2 size={13} />
               </button>
 
-              <ChevronRight size={16} className="text-amber-400/70 flex-shrink-0" />
+              <ChevronRight size={16} className="text-slate-500 flex-shrink-0" />
             </div>
           )
         })}
@@ -320,8 +320,8 @@ export default function HistoryPage() {
           onClick={() => setTab('matching')}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
             tab === 'matching'
-              ? 'bg-amber-500/30 text-amber-200 shadow-sm'
-              : 'text-slate-400 hover:text-amber-300'
+              ? 'bg-slate-700 text-slate-100 shadow-sm'
+              : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           <GitCompare size={14} />
@@ -329,7 +329,7 @@ export default function HistoryPage() {
           {matchCount > 0 && (
             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${
               tab === 'matching'
-                ? 'bg-amber-500/40 text-amber-200'
+                ? 'bg-slate-600 text-slate-200'
                 : 'bg-slate-700 text-slate-400'
             }`}>
               {matchCount}
