@@ -239,11 +239,15 @@ function containerSetMatch(vals) {
 }
 
 // Reference/ID match: "760243297[380K]" == "(760243297(380K))" == "760243297"
+// Also handles OCR confusion: O↔0, I/l↔1 in code strings
 function idMatch(a, b) {
   const clean = s => normalizeDeep(s)
   const ca = clean(a), cb = clean(b)
   if (ca === cb) return true
   if (ca.includes(cb) || cb.includes(ca)) return true
+  // OCR normalization: treat O and 0 as the same (common OCR error in PO numbers, codes)
+  const ocrNorm = s => s.replace(/o/g, '0').replace(/[il]/g, '1')
+  if (ocrNorm(ca) === ocrNorm(cb)) return true
   // Compare leading numeric sequence
   const num = s => (s.match(/\d{5,}/) || [''])[0]
   return num(ca) && num(ca) === num(cb)
