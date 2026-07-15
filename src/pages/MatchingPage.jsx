@@ -554,31 +554,19 @@ function applyFuzzyToFields(fields) {
 function SummaryBlock({ fields, colDefs, isLight }) {
   const subCls     = isLight ? 'text-slate-500' : 'text-slate-400'
   const mismatches = fields.filter(f => f.status === 'mismatch')
-  const missing    = fields.filter(f => f.status === 'missing')
   const matches    = fields.filter(f => f.status === 'match')
-  const total      = fields.length
-
-  const mismatchNames = mismatches.map(f => f.field ?? f.label).join(', ')
-  const missingNames  = missing.map(f => f.field ?? f.label).join(', ')
 
   return (
     <div className={`mt-2 px-3 py-2.5 rounded-xl border text-[11px] leading-relaxed ${
       isLight ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-slate-800/40 border-slate-700/50 text-slate-300'
     }`}>
-      {mismatches.length === 0 && missing.length === 0 ? (
-        <span className="font-semibold text-green-500">✓ All {total} fields match — no issues found.</span>
+      {mismatches.length === 0 ? (
+        <span className="font-semibold text-green-500">✓ All {matches.length} fields match — no issues found.</span>
       ) : (
         <>
           <div>
-            {mismatches.length > 0 && (
-              <><span className="font-semibold text-red-400">⚠ {mismatches.length} Mismatch:</span>{' '}
-              <span className={subCls}>{mismatchNames}</span></>
-            )}
-            {mismatches.length > 0 && missing.length > 0 && <span className={subCls}> · </span>}
-            {missing.length > 0 && (
-              <><span className="font-semibold text-amber-400">◌ {missing.length} Missing:</span>{' '}
-              <span className={subCls}>{missingNames}</span></>
-            )}
+            <span className="font-semibold text-red-400">⚠ {mismatches.length} Mismatch:</span>{' '}
+            <span className={subCls}>{mismatches.map(f => f.field ?? f.label).join(', ')}</span>
           </div>
           {matches.length > 0 && (
             <div className="mt-0.5">
