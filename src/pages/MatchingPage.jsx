@@ -249,11 +249,27 @@ function idMatch(a, b) {
   return num(ca) && num(ca) === num(cb)
 }
 
-// Company name: jaccard on meaningful tokens
+// Company name: significant-word subset matching
+// All sig-words from the SHORTER name must appear in the LONGER → match
+const GENERIC_CO_WORDS = new Set([
+  'co','ltd','inc','corp','corporation','limited','llc','gmbh','sdn','bhd','pte','sa','ag','bv','nv','ab','plc','pty','pvt',
+  'manufacturing','products','industries','industry','international','group','holdings','holding',
+  'enterprise','enterprises','trading','services','service','logistics','supply',
+  'energy','power','chemical','chemicals','company',
+  'thailand','indonesia','malaysia','singapore','vietnam','china','japan','korea',
+  'and','the','of','for','by','or','an','in','on','at','m','a',
+])
+function sigWordMatch(a, b) {
+  const sigWords = s => normalizeDeep(s).split(/\s+/).filter(w => w.length >= 2 && !GENERIC_CO_WORDS.has(w))
+  const wA = sigWords(a), wB = sigWords(b)
+  if (!wA.length || !wB.length) return false
+  const shorter = wA.length <= wB.length ? wA : wB
+  const longerSet = new Set(wA.length <= wB.length ? wB : wA)
+  return shorter.every(w => longerSet.has(w))
+}
 function tokenize(s) {
   return normalizeDeep(s)
-    .replace(/\b(co|ltd|inc|corp|corporation|limited|llc|gmbh|sdn|bhd|pte|energy|m|the|of|and|or|an|by|in|on|at)\b/gi, '')
-    .split(/\s+/).filter(t => t.length > 1)
+    .split(/\s+/).filter(t => t.length > 1 && !GENERIC_CO_WORDS.has(t))
 }
 function jaccardSim(a, b) {
   const setA = new Set(tokenize(a))
@@ -295,7 +311,7 @@ function allPairs(vals, fn) {
 // ── Master status computer ──
 function computeStatus(fieldKey, rawVals) {
   const present = rawVals.filter(Boolean)
-  if (present.length === 0) return 'empty'
+  if (present.length === 0) return 'missing'
   if (present.length < rawVals.length) return 'missing'
 
   // 1. Exact match after deep normalize
@@ -304,51 +320,50 @@ function computeStatus(fieldKey, rawVals) {
 
   const type = fieldType(fieldKey)
 
-  // 2. Container: BL may list multiple — check any element matches
+  // 2. Container: must match exactly
   if (type === 'container') {
-    return containerSetMatch(present) ? 'fuzzy_match' : 'mismatch'
+    return containerSetMatch(present) ? 'match' : 'mismatch'
   }
-  // 3. Reference/ID: strip brackets, compare core number
+  // 3. Reference/ID: strip brackets, compare core
   if (type === 'reference') {
-    return allPairs(present, (a, b) => idMatch(a, b)) ? 'fuzzy_match' : 'mismatch'
+    return allPairs(present, (a, b) => idMatch(a, b)) ? 'match' : 'mismatch'
   }
-  // 4. Location/port: sorted tokens + containment
+  // 4. Location/port: sorted tokens + containment ("LAEM CHABANG, THAILAND" = "LAEM CHABANG")
   if (type === 'location') {
     return allPairs(present, (a, b) =>
       sortedTokenMatch(a, b) || tokenSetContains(a, b) || tokenSetContains(b, a)
-    ) ? 'fuzzy_match' : 'mismatch'
+    ) ? 'match' : 'mismatch'
   }
-  // 5. Voyage: V. prefix already handled by normalizeDeep above; re-check sorted tokens
+  // 5. Voyage: sorted token match
   if (type === 'voyage') {
-    return allPairs(present, (a, b) => sortedTokenMatch(a, b)) ? 'fuzzy_match' : 'mismatch'
+    return allPairs(present, (a, b) => sortedTokenMatch(a, b)) ? 'match' : 'mismatch'
   }
-  // 6. Company names: jaccard on meaningful tokens
+  // 6. Company names: significant-word subset matching
+  // ALL sig-words from shorter name must appear in longer (ignores co/ltd/manufacturing etc.)
   if (type === 'name') {
-    return allPairs(present, (a, b) => jaccardSim(a, b) >= 0.3) ? 'fuzzy_match' : 'mismatch'
+    return allPairs(present, (a, b) => sigWordMatch(a, b)) ? 'match' : 'mismatch'
   }
-  // 7. Addresses: containment or jaccard
+  // 7. Addresses: containment or high jaccard overlap
   if (type === 'address') {
     return allPairs(present, (a, b) =>
-      tokenSetContains(a, b) || tokenSetContains(b, a) || jaccardSim(a, b) >= 0.25
-    ) ? 'fuzzy_match' : 'mismatch'
+      tokenSetContains(a, b) || tokenSetContains(b, a) || jaccardSim(a, b) >= 0.65
+    ) ? 'match' : 'mismatch'
   }
-  // 8. Date: sorted token (handles "MAY 13, 2026" vs "MAY.13,2026")
+  // 8. Date: sorted token
   if (type === 'date') {
-    return allPairs(present, (a, b) => sortedTokenMatch(a, b)) ? 'fuzzy_match' : 'mismatch'
+    return allPairs(present, (a, b) => sortedTokenMatch(a, b)) ? 'match' : 'mismatch'
   }
 
-  // 9. Generic fallback — try all methods so unknown field names still get fuzzy treatment
-  if (allPairs(present, (a, b) => sortedTokenMatch(a, b))) return 'fuzzy_match'
-  if (allPairs(present, (a, b) => tokenSetContains(a, b) || tokenSetContains(b, a))) return 'fuzzy_match'
-  if (allPairs(present, (a, b) => idMatch(a, b))) return 'fuzzy_match'
-  if (allPairs(present, (a, b) => containerListMatch(a, b))) return 'fuzzy_match'
-  if (allPairs(present, (a, b) => jaccardSim(a, b) >= 0.4)) return 'fuzzy_match'
+  // 9. Generic fallback
+  if (allPairs(present, (a, b) => sortedTokenMatch(a, b))) return 'match'
+  if (allPairs(present, (a, b) => tokenSetContains(a, b) || tokenSetContains(b, a))) return 'match'
+  if (allPairs(present, (a, b) => idMatch(a, b))) return 'match'
 
   return 'mismatch'
 }
 
 function matchStatus(a, b) {
-  if (!a && !b) return 'empty'
+  if (!a && !b) return 'missing'
   if (!a || !b) return 'missing'
   if (normalizeDeep(a) === normalizeDeep(b)) return 'match'
   return computeStatus(null, [a, b])
@@ -426,10 +441,10 @@ function CompareTable({ fields, colDefs, isLight }) {
   const nilCls  = isLight ? 'text-slate-400 italic' : 'text-slate-600 italic'
 
   const STATUS_CFG = {
-    match:       { text: '✓ Match',       cls: 'bg-green-500/15 text-green-400 border border-green-500/30' },
-    fuzzy_match: { text: '~ Fuzzy Match', cls: 'bg-teal-500/15 text-teal-400 border border-teal-500/30' },
-    mismatch:    { text: '✗ Mismatch',    cls: 'bg-red-500/15 text-red-400 border border-red-500/30' },
-    missing:     { text: '◐ Missing',     cls: 'bg-amber-500/15 text-amber-400 border border-amber-500/30' },
+    match:       { text: '✓ Match',    cls: 'bg-green-500/15 text-green-400 border border-green-500/30' },
+    fuzzy_match: { text: '✓ Match',    cls: 'bg-green-500/15 text-green-400 border border-green-500/30' },
+    mismatch:    { text: '✗ Mismatch', cls: 'bg-red-500/15 text-red-400 border border-red-500/30' },
+    missing:     { text: '◐ Missing',  cls: 'bg-amber-500/15 text-amber-400 border border-amber-500/30' },
     empty:       { text: 'N/A',           cls: 'bg-slate-500/10 text-slate-500 border border-slate-500/20' },
   }
 
@@ -456,8 +471,8 @@ function CompareTable({ fields, colDefs, isLight }) {
         {SECTION_NAMES.map((section, si) => {
           const sFields = fields.filter(f => f.sectionIdx === si)
           if (sFields.length === 0) return null
-          const tot  = sFields.filter(f => f.status !== 'empty').length
-          const ok   = sFields.filter(f => f.status === 'match' || f.status === 'fuzzy_match').length
+          const tot  = sFields.filter(f => f.status !== 'missing').length
+          const ok   = sFields.filter(f => f.status === 'match').length
           const pct  = tot > 0 ? Math.round(ok / tot * 100) : null
           const pctC = pct === null ? subCls : pct === 100 ? 'text-green-500' : pct >= 50 ? 'text-amber-500' : 'text-red-500'
           return (
@@ -523,15 +538,15 @@ function CompareTable({ fields, colDefs, isLight }) {
   )
 }
 
-// Re-apply smart status to pair fields that came directly from n8n
+// Re-apply deterministic status to fields that came from n8n
 function applyFuzzyToFields(fields) {
   if (!fields) return fields
   return fields.map(f => {
-    if (f.status === 'empty' || f.status === 'match') return f
+    if (f.status === 'match') return f
     const a = f.leftVal ?? null
     const b = f.rightVal ?? null
     const newStatus = computeStatus(f.field, [a, b])
-    return newStatus !== f.status ? { ...f, status: newStatus } : f
+    return { ...f, status: newStatus }
   })
 }
 
@@ -540,7 +555,7 @@ function SummaryBlock({ fields, colDefs, isLight }) {
   const subCls     = isLight ? 'text-slate-500' : 'text-slate-400'
   const mismatches = fields.filter(f => f.status === 'mismatch')
   const missing    = fields.filter(f => f.status === 'missing')
-  const matches    = fields.filter(f => f.status === 'match' || f.status === 'fuzzy_match')
+  const matches    = fields.filter(f => f.status === 'match')
   const total      = fields.length
 
   const mismatchNames = mismatches.map(f => f.field ?? f.label).join(', ')
@@ -578,8 +593,8 @@ function SummaryBlock({ fields, colDefs, isLight }) {
 }
 
 function computeStats(fields) {
-  const tot  = fields.filter(f => f.status !== 'empty').length
-  const ok   = fields.filter(f => f.status === 'match' || f.status === 'fuzzy_match').length
+  const tot  = fields.filter(f => f.status !== 'missing').length
+  const ok   = fields.filter(f => f.status === 'match').length
   const mm   = fields.filter(f => f.status === 'mismatch').length
   const ms   = fields.filter(f => f.status === 'missing').length
   const rate = tot > 0 ? Math.round(mm / tot * 100) : 0
