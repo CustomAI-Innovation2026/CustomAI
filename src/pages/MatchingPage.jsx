@@ -1029,7 +1029,7 @@ function DetailsModal({ pairResults, panels, selectedCombo, isLight, onClose }) 
               📊 {selectedCombo?.types?.map(t => DOC_TYPES.find(d => d.id === t)?.short).join('·')}
             </button>
           )}
-          {groupViews.map((gTypes, gi) => (
+          {(selectedCombo?.types?.length ?? 0) < 4 && groupViews.map((gTypes, gi) => (
             <button
               key={`mg${gi}`}
               onClick={() => setActivePair(-(gi + 100))}
@@ -1741,8 +1741,8 @@ export default function MatchingPage() {
                           📊 {comboTypes.map(t => DOC_TYPES.find(d => d.id === t)?.short).join('·')}
                         </button>
                       )}
-                      {/* 3-doc group tabs (4-doc mode only) */}
-                      {groupViews.map((gTypes, gi) => (
+                      {/* 3-doc group tabs — hidden when 4 docs selected (only ALL tab shown) */}
+                      {comboTypes.length < 4 && groupViews.map((gTypes, gi) => (
                         <button
                           key={`g${gi}`}
                           onClick={() => setActiveGroupIdx(gi)}
