@@ -315,8 +315,10 @@ function allPairs(vals, fn) {
 // ── Master status computer ──
 function computeStatus(fieldKey, rawVals) {
   const present = rawVals.filter(Boolean)
-  if (present.length === 0) return 'missing'
-  if (present.length < rawVals.length) return 'missing'
+  // 0 or 1 doc has the value → no comparison possible → dash
+  if (present.length === 0) return 'none'
+  if (present.length === 1) return 'none'
+  // ≥2 docs have value → compare those values only
 
   // 1. Exact match after deep normalize
   const deepNorm = present.map(normalizeDeep)
@@ -448,8 +450,9 @@ function CompareTable({ fields, colDefs, isLight }) {
     match:       { text: '✓ Match',    cls: 'bg-green-500/15 text-green-400 border border-green-500/30' },
     fuzzy_match: { text: '✓ Match',    cls: 'bg-green-500/15 text-green-400 border border-green-500/30' },
     mismatch:    { text: '✗ Mismatch', cls: 'bg-red-500/15 text-red-400 border border-red-500/30' },
-    missing:     { text: '◐ Missing',  cls: 'bg-amber-500/15 text-amber-400 border border-amber-500/30' },
-    empty:       { text: 'N/A',           cls: 'bg-slate-500/10 text-slate-500 border border-slate-500/20' },
+    missing:     { text: '—',          cls: 'bg-slate-500/10 text-slate-400 border border-slate-500/20' },
+    none:        { text: '—',          cls: 'bg-slate-500/10 text-slate-400 border border-slate-500/20' },
+    empty:       { text: '—',          cls: 'bg-slate-500/10 text-slate-400 border border-slate-500/20' },
   }
 
   return (
@@ -475,7 +478,7 @@ function CompareTable({ fields, colDefs, isLight }) {
         {SECTION_NAMES.map((section, si) => {
           const sFields = fields.filter(f => f.sectionIdx === si)
           if (sFields.length === 0) return null
-          const tot  = sFields.filter(f => f.status !== 'missing').length
+          const tot  = sFields.filter(f => f.status !== 'missing' && f.status !== 'none').length
           const ok   = sFields.filter(f => f.status === 'match').length
           const pct  = tot > 0 ? Math.round(ok / tot * 100) : null
           const pctC = pct === null ? subCls : pct === 100 ? 'text-green-500' : pct >= 50 ? 'text-amber-500' : 'text-red-500'
@@ -497,8 +500,6 @@ function CompareTable({ fields, colDefs, isLight }) {
               {sFields.map((f, fi) => {
                 const rowBg = f.status === 'mismatch'
                   ? (isLight ? 'bg-red-50/50' : 'bg-red-500/5')
-                  : f.status === 'missing'
-                  ? (isLight ? 'bg-amber-50/30' : 'bg-amber-500/5')
                   : ''
                 const sCfg = STATUS_CFG[f.status] ?? STATUS_CFG.empty
                 return (
@@ -515,21 +516,9 @@ function CompareTable({ fields, colDefs, isLight }) {
                       )
                     })}
                     <td className="px-2 py-2 text-center align-top">
-                      {(() => {
-                        if (f.status === 'missing' && f.values) {
-                          const missingLabels = colDefs.filter(col => !f.values[col.key]).map(col => col.label)
-                          return (
-                            <span className={`inline-block px-1.5 py-0.5 rounded-full text-[9px] font-bold ${sCfg.cls}`}>
-                              ◐ Missing: {missingLabels.join(', ')}
-                            </span>
-                          )
-                        }
-                        return (
-                          <span className={`inline-block px-1.5 py-0.5 rounded-full text-[9px] font-bold ${sCfg.cls}`}>
-                            {sCfg.text}
-                          </span>
-                        )
-                      })()}
+                      <span className={`inline-block px-1.5 py-0.5 rounded-full text-[9px] font-bold ${sCfg.cls}`}>
+                        {sCfg.text}
+                      </span>
                     </td>
                   </tr>
                 )
@@ -585,22 +574,20 @@ function SummaryBlock({ fields, colDefs, isLight }) {
 }
 
 function computeStats(fields) {
-  const tot  = fields.filter(f => f.status !== 'missing').length
+  const tot  = fields.filter(f => f.status !== 'missing' && f.status !== 'none').length
   const ok   = fields.filter(f => f.status === 'match').length
   const mm   = fields.filter(f => f.status === 'mismatch').length
-  const ms   = fields.filter(f => f.status === 'missing').length
   const rate = tot > 0 ? Math.round(mm / tot * 100) : 0
-  return { tot, ok, mm, ms, rate }
+  return { tot, ok, mm, rate }
 }
 
-function StatsCards({ tot, ok, mm, ms, rate, subCls, isLight }) {
+function StatsCards({ tot, ok, mm, rate, subCls, isLight }) {
   return (
-    <div className="grid grid-cols-5 gap-1.5">
+    <div className="grid grid-cols-4 gap-1.5">
       {[
         { label: 'Fields',     val: tot,        color: subCls },
         { label: 'Match',      val: ok,         color: 'text-green-500' },
         { label: 'Mismatch',   val: mm,         color: 'text-red-500' },
-        { label: 'Missing',    val: ms,         color: 'text-amber-500' },
         { label: '% Mismatch', val: `${rate}%`, color: 'text-red-500' },
       ].map(({ label, val, color }) => (
         <div key={label} className={`rounded-xl p-2 text-center border ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-800/50 border-slate-700'}`}>
@@ -852,14 +839,11 @@ function MatchRow({ field, leftVal, rightVal, isLight }) {
 // Compute row-level status + "present in" label for multi-doc
 function getMultiDocRowStatus(types, values) {
   const present = types.filter(t => values[t])
-  if (present.length === 0) return { status: 'empty', label: 'N/A' }
+  if (present.length <= 1) return { status: 'none', label: '—' }
   const norms = present.map(t => normalize(values[t]))
   const allSame = norms.every(n => n === norms[0])
-  if (!allSame) return { status: 'mismatch', label: '✗ Mismatch' }
-  if (present.length === types.length) return { status: 'match', label: '✓ Match' }
-  // some docs have value, all agreeing
-  const shorts = present.map(t => DOC_TYPES.find(d => d.id === t)?.short ?? t)
-  return { status: 'partial', label: shorts.join(' · ') + ' only' }
+  if (allSame) return { status: 'match', label: '✓ Match' }
+  return { status: 'mismatch', label: '✗ Mismatch' }
 }
 
 // ── MultiDocRow ── N-column field row for all-docs view ───────
@@ -867,12 +851,11 @@ function MultiDocRow({ label, docTypes, values, isLight }) {
   const { status: rowStatus, label: statusLabel } = getMultiDocRowStatus(docTypes, values)
 
   const rowBorder = {
-    match:   isLight ? 'border-green-200 bg-green-50/40'    : 'border-green-500/20 bg-green-500/5',
-    mismatch:isLight ? 'border-red-200 bg-red-50/40'        : 'border-red-500/20 bg-red-500/5',
-    partial: isLight ? 'border-amber-200 bg-amber-50/40'    : 'border-amber-500/20 bg-amber-500/5',
-    empty:   isLight ? 'border-slate-200 bg-slate-50/50'    : 'border-slate-700/30 bg-slate-800/20',
-  }[rowStatus]
-  const statusCls = { match: 'text-green-500', mismatch: 'text-red-400', partial: 'text-amber-400', empty: 'text-slate-400' }[rowStatus]
+    match:    isLight ? 'border-green-200 bg-green-50/40'    : 'border-green-500/20 bg-green-500/5',
+    mismatch: isLight ? 'border-red-200 bg-red-50/40'        : 'border-red-500/20 bg-red-500/5',
+    none:     isLight ? 'border-slate-200 bg-slate-50/50'    : 'border-slate-700/30 bg-slate-800/20',
+  }[rowStatus] ?? (isLight ? 'border-slate-200 bg-slate-50/50' : 'border-slate-700/30 bg-slate-800/20')
+  const statusCls = { match: 'text-green-500', mismatch: 'text-red-400', none: 'text-slate-400' }[rowStatus] ?? 'text-slate-400'
 
   return (
     <div className={`rounded-xl border mb-1.5 px-2.5 py-2 ${rowBorder}`}>
@@ -882,10 +865,9 @@ function MultiDocRow({ label, docTypes, values, isLight }) {
           const badgeCls = {
             match:    'bg-green-500/15 text-green-400 border border-green-500/30',
             mismatch: 'bg-red-500/15 text-red-400 border border-red-500/30',
-            partial:  'bg-amber-500/15 text-amber-400 border border-amber-500/30',
-            empty:    'bg-slate-500/10 text-slate-500 border border-slate-500/20',
+            none:     'bg-slate-500/10 text-slate-500 border border-slate-500/20',
           }[rowStatus] ?? 'bg-slate-500/10 text-slate-500 border border-slate-500/20'
-          const badgeText = rowStatus === 'match' ? '✓ Match' : rowStatus === 'mismatch' ? '✗ Mismatch' : rowStatus === 'partial' ? `◐ ${statusLabel}` : 'N/A'
+          const badgeText = rowStatus === 'match' ? '✓ Match' : rowStatus === 'mismatch' ? '✗ Mismatch' : '—'
           return <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold flex-shrink-0 ${badgeCls}`}>{badgeText}</span>
         })()}
       </div>
@@ -1060,7 +1042,7 @@ function DetailsModal({ pairResults, panels, selectedCombo, isLight, onClose }) 
               📊 {gTypes.map(t => DOC_TYPES.find(d => d.id === t)?.short).join('·')}
             </button>
           ))}
-          {pairResults.map((pr, i) => (
+          {(selectedCombo?.types?.length ?? 0) <= 2 && pairResults.map((pr, i) => (
             <button
               key={i}
               onClick={() => setActivePair(i)}
@@ -1137,10 +1119,10 @@ function DetailsModal({ pairResults, panels, selectedCombo, isLight, onClose }) 
               const dt = DOC_TYPES.find(d => d.id === t)
               return { key: t, label: dt?.short ?? t, emoji: dt?.emoji }
             })
-            const { tot, ok, mm, ms, rate } = computeStats(tableFields)
+            const { tot, ok, mm, rate } = computeStats(tableFields)
             return (
               <>
-                <StatsCards tot={tot} ok={ok} mm={mm} ms={ms} rate={rate} subCls={subCls} isLight={isLight} />
+                <StatsCards tot={tot} ok={ok} mm={mm} rate={rate} subCls={subCls} isLight={isLight} />
                 <SummaryBlock fields={tableFields} colDefs={colDefs} isLight={isLight} />
                 <div className="overflow-x-auto">
                   <CompareTable fields={tableFields} colDefs={colDefs} isLight={isLight} />
@@ -1155,10 +1137,10 @@ function DetailsModal({ pairResults, panels, selectedCombo, isLight, onClose }) 
               { key: 'left',  label: leftDT?.short  ?? 'Left',  emoji: pair?.leftEmoji },
               { key: 'right', label: rightDT?.short ?? 'Right', emoji: pair?.rightEmoji },
             ]
-            const { tot, ok, mm, ms, rate } = computeStats(fp.fields || [])
+            const { tot, ok, mm, rate } = computeStats(fp.fields || [])
             return (
               <>
-                <StatsCards tot={tot} ok={ok} mm={mm} ms={ms} rate={rate} subCls={subCls} isLight={isLight} />
+                <StatsCards tot={tot} ok={ok} mm={mm} rate={rate} subCls={subCls} isLight={isLight} />
                 <SummaryBlock fields={fp.fields || []} colDefs={pairColDefs} isLight={isLight} />
                 <div className="overflow-x-auto">
                   <CompareTable fields={fp.fields} colDefs={pairColDefs} isLight={isLight} />
@@ -1200,7 +1182,7 @@ export default function MatchingPage() {
   const [panels,        setPanels]        = useState([])
   // Results
   const [matchResults,   setMatchResults]   = useState(null)
-  const [activePairIdx,  setActivePairIdx]  = useState(0)
+  const [activePairIdx,  setActivePairIdx]  = useState(-1)
   const [activeGroupIdx, setActiveGroupIdx] = useState(null) // null=pair/ALL, 0+= sub-group view
   const [activeFileIdx,  setActiveFileIdx]  = useState(0)
   const [comparing,      setComparing]      = useState(false)
@@ -1728,7 +1710,7 @@ export default function MatchingPage() {
                   </div>
                   <button
                     onClick={() => setDetailsOpen(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 transition-colors"
                   >
                     <FileText size={11} />
                     See more Details
@@ -1773,8 +1755,8 @@ export default function MatchingPage() {
                           📊 {gTypes.map(t => DOC_TYPES.find(d => d.id === t)?.short).join('·')}
                         </button>
                       ))}
-                      {/* Pair tabs */}
-                      {matchResults.map((pair, i) => {
+                      {/* Pair tabs — hidden when 3+ doc types selected */}
+                      {comboTypes.length <= 2 && matchResults.map((pair, i) => {
                         const fp = pair.filePairs[activeFileIdx] ?? pair.filePairs[0]
                         const pct = fp?.summary.pct ?? 0
                         const pctColor = pct >= 80 ? 'text-green-400' : pct >= 50 ? 'text-amber-400' : 'text-red-400'
@@ -1865,14 +1847,14 @@ export default function MatchingPage() {
                     const statsFields = relevantPairs.length > 0
                       ? buildMultiDocTableFromPairs(relevantPairs, multiTypes, activeFileIdx)
                       : buildUnifiedFields(multiTypes, docDataMap)
-                    const { tot, ok, mm, ms, rate } = computeStats(statsFields)
+                    const { tot, ok, mm, rate } = computeStats(statsFields)
                     const colDefs = multiTypes.map(t => {
                       const dt = DOC_TYPES.find(d => d.id === t)
                       return { key: t, label: dt?.short ?? t, emoji: dt?.emoji }
                     })
                     return (
                       <>
-                        <StatsCards tot={tot} ok={ok} mm={mm} ms={ms} rate={rate} subCls={subCls} isLight={isLight} />
+                        <StatsCards tot={tot} ok={ok} mm={mm} rate={rate} subCls={subCls} isLight={isLight} />
                         <SummaryBlock fields={statsFields} colDefs={colDefs} isLight={isLight} />
                       </>
                     )
@@ -1882,7 +1864,7 @@ export default function MatchingPage() {
                   const pair = matchResults[activePairIdx]
                   if (!_fp0 || !pair) return null
                   const fp = { ..._fp0, fields: applyFuzzyToFields(_fp0.fields || []) }
-                  const { tot, ok, mm, ms, rate } = computeStats(fp.fields)
+                  const { tot, ok, mm, rate } = computeStats(fp.fields)
                   const leftDT  = DOC_TYPES.find(d => d.id === pair.leftType)
                   const rightDT = DOC_TYPES.find(d => d.id === pair.rightType)
                   const pairColDefs = [
@@ -1891,7 +1873,7 @@ export default function MatchingPage() {
                   ]
                   return (
                     <>
-                      <StatsCards tot={tot} ok={ok} mm={mm} ms={ms} rate={rate} subCls={subCls} isLight={isLight} />
+                      <StatsCards tot={tot} ok={ok} mm={mm} rate={rate} subCls={subCls} isLight={isLight} />
                       <SummaryBlock fields={fp.fields} colDefs={pairColDefs} isLight={isLight} />
                     </>
                   )
