@@ -1,6 +1,7 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { LayoutDashboard, Upload, History, Settings, ChevronRight, LogOut, GitCompare, Sun, Moon } from 'lucide-react'
 import { useTheme } from '../../lib/theme.jsx'
+import { logoutUser, getCurrentUser } from '../../lib/auth.js'
 
 const navItems = [
   { to: '/app',          icon: LayoutDashboard, label: 'Dashboard',          end: true },
@@ -90,13 +91,23 @@ export default function AppLayout() {
             <Settings size={16} className={isLight ? 'text-slate-400' : 'text-slate-500 group-hover:text-slate-300'} />
             Settings
           </button>
+          {/* User info */}
+          {(() => {
+            const u = getCurrentUser()
+            return u ? (
+              <div className={`px-3 py-2 rounded-xl text-xs ${isLight ? 'bg-slate-50 text-slate-500' : 'bg-slate-800/40 text-slate-400'}`}>
+                <p className="font-semibold truncate">{u.name} {u.surname}</p>
+                <p className="truncate opacity-70">{u.email}</p>
+              </div>
+            ) : null
+          })()}
           <button
-            onClick={() => navigate('/')}
+            onClick={() => { logoutUser(); navigate('/') }}
             className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-150 w-full group
-              ${isLight ? 'text-slate-500 hover:text-slate-800 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'}`}
+              ${isLight ? 'text-red-400 hover:text-red-600 hover:bg-red-50' : 'text-red-400/70 hover:text-red-400 hover:bg-red-900/20'}`}
           >
-            <LogOut size={16} className={isLight ? 'text-slate-400' : 'text-slate-500 group-hover:text-slate-300'} />
-            Back to Home
+            <LogOut size={16} />
+            Log Out
           </button>
         </div>
       </aside>

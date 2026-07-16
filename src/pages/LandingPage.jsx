@@ -1,299 +1,367 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  Zap, FileText, Brain, Database, ArrowRight, CheckCircle,
-  Upload, Cpu, BarChart3, Shield, Clock, Star, ChevronRight, Github, Sun, Moon
-} from 'lucide-react'
+import { Sun, Moon, Eye, EyeOff, X, Loader2, User } from 'lucide-react'
 import { useTheme } from '../lib/theme.jsx'
+import { loginUser, registerUser, resetUserPassword, updateUserPassword, setCurrentUser } from '../lib/auth.js'
 
-const FEATURES = [
-  {
-    icon: Upload,
-    title: 'Drag & Drop Upload',
-    desc: 'Upload PDF, PNG, JPG invoices instantly. Supports batch processing up to 50 files.',
-    color: 'text-blue-400',
-    bg: 'bg-blue-500/10',
-  },
-  {
-    icon: Brain,
-    title: 'AI-Powered OCR',
-    desc: 'GPT-4o vision extracts every field — vendor, date, total, tax, line items — with 99%+ accuracy.',
-    color: 'text-purple-400',
-    bg: 'bg-purple-500/10',
-  },
-  {
-    icon: Zap,
-    title: 'n8n Automation',
-    desc: 'Your n8n workflow orchestrates the AI pipeline. Swap LLMs, add steps, zero code changes.',
-    color: 'text-yellow-400',
-    bg: 'bg-yellow-500/10',
-  },
-  {
-    icon: Database,
-    title: 'Supabase Storage',
-    desc: 'All documents and extracted data live in your Supabase project. Real-time updates via WebSockets.',
-    color: 'text-green-400',
-    bg: 'bg-green-500/10',
-  },
-  {
-    icon: BarChart3,
-    title: 'Export & Analytics',
-    desc: 'Export structured data as JSON, CSV, or push directly to your ERP or accounting system.',
-    color: 'text-orange-400',
-    bg: 'bg-orange-500/10',
-  },
-  {
-    icon: Shield,
-    title: 'Secure by Default',
-    desc: 'Row-level security on every table. Files encrypted at rest. No data leaves your infrastructure.',
-    color: 'text-red-400',
-    bg: 'bg-red-500/10',
-  },
-]
+// ── Shared Modal wrapper ──────────────────────────────────────────────────────
+function Modal({ isLight, onClose, title, children }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div
+        className={`relative w-full max-w-sm rounded-2xl shadow-2xl p-5 ${
+          isLight ? 'bg-white' : 'bg-slate-800 border border-slate-700'
+        }`}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h3 className={`font-bold text-sm ${isLight ? 'text-slate-800' : 'text-white'}`}>{title}</h3>
+          <button onClick={onClose} className={`rounded-lg p-1 transition-colors ${isLight ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100' : 'text-slate-500 hover:text-slate-200 hover:bg-slate-700'}`}>
+            <X size={14} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
 
-const STEPS = [
-  { num: '01', title: 'Upload Document', desc: 'Drop any invoice, receipt, or purchase order.' },
-  { num: '02', title: 'n8n Processes', desc: 'Your automation pipeline validates and routes to LLM.' },
-  { num: '03', title: 'AI Extracts Data', desc: 'GPT-4o vision reads every field with structured output.' },
-  { num: '04', title: 'Review & Export', desc: 'Confirm results, edit if needed, export as CSV/JSON.' },
-]
+function FieldInput({ label, type = 'text', value, onChange, placeholder, required = true, isLight, showToggle, onToggle, show }) {
+  const inputCls = `w-full px-3 py-2 rounded-xl text-xs border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400/40 ${
+    isLight
+      ? 'bg-slate-50 border-slate-200 text-slate-800 placeholder:text-slate-300'
+      : 'bg-slate-700/60 border-slate-600 text-white placeholder:text-slate-500'
+  }`
+  return (
+    <div>
+      <label className={`block text-[11px] font-medium mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{label}</label>
+      <div className="relative">
+        <input
+          type={showToggle ? (show ? 'text' : 'password') : type}
+          value={value} onChange={onChange} placeholder={placeholder} required={required}
+          className={inputCls + (showToggle ? ' pr-9' : '')}
+        />
+        {showToggle && (
+          <button type="button" onClick={onToggle} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-500">
+            {show ? <EyeOff size={13} /> : <Eye size={13} />}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
 
-const STATS = [
-  { value: '99.2%', label: 'Extraction Accuracy' },
-  { value: '<15s', label: 'Avg Processing Time' },
-  { value: '50+', label: 'Document Types' },
-  { value: '∞', label: 'Monthly Documents' },
-]
+// ── Register Modal ────────────────────────────────────────────────────────────
+function RegisterModal({ isLight, onClose }) {
+  const [form, setForm] = useState({ name: '', surname: '', email: '', businessUnit: '', password: '', confirmPassword: '' })
+  const [showPw, setShowPw] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
 
+  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError('')
+    if (!form.name || !form.surname || !form.email || !form.businessUnit || !form.password) return setError('All fields are required')
+    if (form.password !== form.confirmPassword) return setError('Passwords do not match')
+    if (form.password.length < 6) return setError('Password must be at least 6 characters')
+    setLoading(true)
+    try {
+      await registerUser({ name: form.name, surname: form.surname, email: form.email, businessUnit: form.businessUnit, password: form.password })
+      setSuccess(true)
+    } catch (err) {
+      setError(err.message || 'Registration failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (success) return (
+    <Modal isLight={isLight} onClose={onClose} title="Create Account">
+      <div className="text-center py-3">
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-3 ${isLight ? 'bg-green-100' : 'bg-green-900/40'}`}>
+          <span className="text-green-500 font-bold text-base">✓</span>
+        </div>
+        <p className={`font-semibold text-sm mb-1 ${isLight ? 'text-slate-800' : 'text-white'}`}>Account created!</p>
+        <p className={`text-xs mb-4 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>You can now log in with your email and password.</p>
+        <button onClick={onClose} className="btn-primary text-xs px-6 py-2">Back to Login</button>
+      </div>
+    </Modal>
+  )
+
+  return (
+    <Modal isLight={isLight} onClose={onClose} title="Create Account">
+      <form onSubmit={handleSubmit} className="space-y-2.5">
+        <div className="grid grid-cols-2 gap-2">
+          <FieldInput label="Name" value={form.name} onChange={set('name')} placeholder="First name" isLight={isLight} />
+          <FieldInput label="Surname" value={form.surname} onChange={set('surname')} placeholder="Last name" isLight={isLight} />
+        </div>
+        <FieldInput label="Email" type="email" value={form.email} onChange={set('email')} placeholder="you@company.com" isLight={isLight} />
+        <FieldInput label="Business Unit" value={form.businessUnit} onChange={set('businessUnit')} placeholder="e.g. Operations, Finance" isLight={isLight} />
+        <FieldInput label="Password" value={form.password} onChange={set('password')} isLight={isLight} showToggle onToggle={() => setShowPw(p => !p)} show={showPw} />
+        <FieldInput label="Confirm Password" value={form.confirmPassword} onChange={set('confirmPassword')} isLight={isLight} showToggle onToggle={() => setShowPw(p => !p)} show={showPw} />
+        {error && <p className="text-red-500 text-[11px]">{error}</p>}
+        <button type="submit" disabled={loading} className="w-full btn-primary text-xs py-2 mt-1 flex items-center justify-center gap-1.5">
+          {loading && <Loader2 size={12} className="animate-spin" />}
+          Create Account
+        </button>
+      </form>
+    </Modal>
+  )
+}
+
+// ── Forgot Password Modal ─────────────────────────────────────────────────────
+function ForgotPasswordModal({ isLight, onClose }) {
+  const [step, setStep] = useState(1)
+  const [email, setEmail] = useState('')
+  const [tempPw, setTempPw] = useState('')
+  const [newPw, setNewPw] = useState('')
+  const [confirmPw, setConfirmPw] = useState('')
+  const [showPw, setShowPw] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
+
+  async function handleStep1(e) {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      const temp = await resetUserPassword(email)
+      setTempPw(temp)
+      setStep(2)
+    } catch (err) {
+      setError(err.message || 'Email not found')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleStep2(e) {
+    e.preventDefault()
+    setError('')
+    if (newPw !== confirmPw) return setError('Passwords do not match')
+    if (newPw.length < 6) return setError('Password must be at least 6 characters')
+    setLoading(true)
+    try {
+      await updateUserPassword(email, newPw)
+      setSuccess(true)
+    } catch (err) {
+      setError(err.message || 'Failed to update password')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const title = step === 1 ? 'Forgot Password' : 'Set New Password'
+
+  if (success) return (
+    <Modal isLight={isLight} onClose={onClose} title={title}>
+      <div className="text-center py-3">
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-3 ${isLight ? 'bg-green-100' : 'bg-green-900/40'}`}>
+          <span className="text-green-500 font-bold text-base">✓</span>
+        </div>
+        <p className={`font-semibold text-sm mb-1 ${isLight ? 'text-slate-800' : 'text-white'}`}>Password updated!</p>
+        <p className={`text-xs mb-4 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>You can now log in with your new password.</p>
+        <button onClick={onClose} className="btn-primary text-xs px-6 py-2">Back to Login</button>
+      </div>
+    </Modal>
+  )
+
+  return (
+    <Modal isLight={isLight} onClose={onClose} title={title}>
+      {step === 1 ? (
+        <form onSubmit={handleStep1} className="space-y-3">
+          <p className={`text-[11px] leading-relaxed ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+            Enter your registered email address. A temporary 8-character password will be generated.
+          </p>
+          <FieldInput label="Email (Organization)" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" isLight={isLight} />
+          {error && <p className="text-red-500 text-[11px]">{error}</p>}
+          <button type="submit" disabled={loading} className="w-full btn-primary text-xs py-2 flex items-center justify-center gap-1.5">
+            {loading && <Loader2 size={12} className="animate-spin" />}
+            Generate Temporary Password
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={handleStep2} className="space-y-3">
+          <div className={`p-3 rounded-xl border ${isLight ? 'bg-amber-50 border-amber-200' : 'bg-amber-900/20 border-amber-700/40'}`}>
+            <p className={`text-[11px] font-medium mb-1.5 ${isLight ? 'text-amber-700' : 'text-amber-300'}`}>Your temporary password:</p>
+            <p className="text-sm font-mono font-bold tracking-[0.2em] text-amber-600">{tempPw}</p>
+            <p className={`text-[11px] mt-1.5 ${isLight ? 'text-amber-600' : 'text-amber-400'}`}>Save this and set a new permanent password below.</p>
+          </div>
+          <FieldInput label="New Password" value={newPw} onChange={e => setNewPw(e.target.value)} isLight={isLight} showToggle onToggle={() => setShowPw(p => !p)} show={showPw} />
+          <FieldInput label="Confirm New Password" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} isLight={isLight} showToggle onToggle={() => setShowPw(p => !p)} show={showPw} />
+          {error && <p className="text-red-500 text-[11px]">{error}</p>}
+          <button type="submit" disabled={loading} className="w-full btn-primary text-xs py-2 flex items-center justify-center gap-1.5">
+            {loading && <Loader2 size={12} className="animate-spin" />}
+            Set New Password
+          </button>
+        </form>
+      )}
+    </Modal>
+  )
+}
+
+// ── Main Landing / Login Page ─────────────────────────────────────────────────
 export default function LandingPage() {
   const navigate = useNavigate()
   const { theme, toggle } = useTheme()
   const isLight = theme === 'light'
 
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPw, setShowPw] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [showRegister, setShowRegister] = useState(false)
+  const [showForgot, setShowForgot] = useState(false)
+
+  async function handleLogin(e) {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      const user = await loginUser(email, password)
+      setCurrentUser(user)
+      navigate('/app')
+    } catch (err) {
+      setError(err.message || 'Login failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const inputCls = `w-full px-3 py-2.5 rounded-2xl text-sm border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400/40 ${
+    isLight
+      ? 'bg-slate-100/80 border-slate-200 text-slate-800 placeholder:text-slate-400'
+      : 'bg-slate-700/60 border-slate-600 text-white placeholder:text-slate-500'
+  }`
+
   return (
-    <div data-theme={theme} className="min-h-screen gradient-mesh font-sans">
-      {/* Navbar */}
-      <header className={`fixed top-0 inset-x-0 z-50 border-b backdrop-blur-xl transition-colors duration-200
-        ${isLight
-          ? 'border-slate-200/80 bg-white/85'
-          : 'border-white/5 bg-slate-950/80'}`}>
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img
-              src={isLight ? '/CustomAI/logo-blue.webp' : '/CustomAI/logo-white.png'}
-              alt="SCGJWD Logo"
-              className="h-8 w-auto object-contain"
-            />
-          </div>
-
-          <nav className={`hidden md:flex items-center gap-8 text-sm transition-colors duration-200
-            ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-            <a href="#features" className={`transition-colors ${isLight ? 'hover:text-brand-700' : 'hover:text-white'}`}>Features</a>
-            <a href="#how-it-works" className={`transition-colors ${isLight ? 'hover:text-brand-700' : 'hover:text-white'}`}>How it works</a>
-            <a href="#stats" className={`transition-colors ${isLight ? 'hover:text-brand-700' : 'hover:text-white'}`}>Stats</a>
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={toggle}
-              title={isLight ? 'Switch to Dark' : 'Switch to Light'}
-              className={`p-2 rounded-lg transition-all duration-200
-                ${isLight
-                  ? 'bg-slate-100 hover:bg-blue-50 text-amber-500 border border-slate-200'
-                  : 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-amber-400'}`}
-            >
-              {isLight ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
-            <a
-              href="https://github.com/wallapsu-data/CustomAI"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`flex items-center gap-2 text-sm transition-colors
-                ${isLight
-                  ? 'text-slate-500 hover:text-brand-700'
-                  : 'text-slate-400 hover:text-white'}`}
-            >
-              <Github size={16} />
-              <span className="hidden sm:inline">GitHub</span>
-            </a>
-            <button
-              onClick={() => navigate('/app/upload')}
-              className="btn-primary text-sm py-2 px-4"
-            >
-              Start Scanning →
-            </button>
-          </div>
+    <div
+      data-theme={theme}
+      className="min-h-screen flex flex-col"
+      style={{
+        background: isLight
+          ? 'radial-gradient(ellipse at 15% 15%, rgba(147,197,253,0.45) 0%, transparent 55%), radial-gradient(ellipse at 85% 85%, rgba(253,186,116,0.35) 0%, transparent 55%), #f8fafc'
+          : 'radial-gradient(ellipse at 15% 15%, rgba(37,99,235,0.25) 0%, transparent 55%), radial-gradient(ellipse at 85% 85%, rgba(194,65,12,0.2) 0%, transparent 55%), #0f172a',
+      }}
+    >
+      {/* Top bar */}
+      <header className={`flex items-center justify-between px-6 py-3 border-b ${isLight ? 'border-slate-200/60 bg-white/60' : 'border-white/5 bg-black/10'} backdrop-blur-md`}>
+        <div className="flex items-center gap-3">
+          <img
+            src={isLight ? '/CustomAI/logo-blue.webp' : '/CustomAI/logo-white.png'}
+            alt="SCGJWD"
+            className="h-7 w-auto object-contain"
+          />
+          <span className={`text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'} hidden sm:block`}>
+            AI OCR and Data Matching Verification
+          </span>
         </div>
+        <button
+          onClick={toggle}
+          className={`p-2 rounded-xl transition-all ${isLight ? 'bg-slate-100 hover:bg-slate-200 text-amber-500' : 'bg-slate-800 hover:bg-slate-700 text-amber-400'}`}
+        >
+          {isLight ? <Sun size={15} /> : <Moon size={15} />}
+        </button>
       </header>
 
-      {/* Hero */}
-      <section className="pt-40 pb-32 px-6 text-center relative overflow-hidden">
-        {/* Decorative glows */}
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[600px] h-[500px] rounded-full bg-brand-600/15 blur-3xl pointer-events-none" />
-        <div className="absolute top-32 right-[15%] w-[280px] h-[280px] rounded-full bg-orange-500/20 blur-3xl pointer-events-none" />
-
-        <div className="relative max-w-4xl mx-auto">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 glass rounded-full px-4 py-2 text-sm text-slate-300 mb-8 animate-fade-in border border-orange-500/20">
-            <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
-            Powered by Gemini Vision + n8n Automation
-          </div>
-
-          {/* Headline */}
-          <h1 className="text-5xl md:text-7xl font-extrabold text-white leading-tight mb-6 animate-slide-up">
-            Extract Invoice Data{' '}
-            <span className="gradient-text">Instantly</span>
-            <br />with AI OCR
-          </h1>
-
-          <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed animate-slide-up">
-            Drop any invoice or receipt. Our AI pipeline powered by GPT-4o and n8n
-            extracts every field — vendor, amount, line items — in under 15 seconds.
-            Stored securely in Supabase.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-slide-up">
-            <button
-              onClick={() => navigate('/app/upload')}
-              className="btn-primary flex items-center gap-2 text-base"
-            >
-              <Upload size={18} />
-              Upload Your First Invoice
-              <ArrowRight size={16} />
-            </button>
-            <button
-              onClick={() => navigate('/app')}
-              className="btn-secondary flex items-center gap-2 text-base"
-            >
-              <BarChart3 size={18} />
-              View Dashboard
-            </button>
-          </div>
-
-          {/* Trust indicators */}
-          <div className="flex flex-wrap items-center justify-center gap-6 mt-12 text-sm text-slate-500">
-            {['No credit card', 'Self-hosted n8n', 'Open source on GitHub', 'Supabase backend'].map(t => (
-              <span key={t} className="flex items-center gap-1.5">
-                <CheckCircle size={14} className="text-green-400" />
-                {t}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Stats Bar */}
-      <section id="stats" className="py-16 border-y border-white/5">
-        <div className="max-w-5xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8">
-          {STATS.map(({ value, label }) => (
-            <div key={label} className="text-center">
-              <p className="text-4xl font-extrabold gradient-text mb-2">{value}</p>
-              <p className="text-slate-400 text-sm">{label}</p>
+      {/* Center — login card */}
+      <div className="flex-1 flex items-center justify-center px-4">
+        <div
+          className={`w-full max-w-[320px] rounded-3xl shadow-2xl p-6 ${
+            isLight
+              ? 'bg-white/90 border border-slate-200/80'
+              : 'bg-slate-800/80 border border-slate-700/60 backdrop-blur-xl'
+          }`}
+        >
+          {/* Card header */}
+          <div className="flex items-center gap-2.5 mb-5">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${isLight ? 'bg-slate-100' : 'bg-slate-700'}`}>
+              <User size={17} className={isLight ? 'text-slate-400' : 'text-slate-400'} />
             </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Features Grid */}
-      <section id="features" className="py-24 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <p className="text-brand-400 text-sm font-semibold uppercase tracking-widest mb-3">Features</p>
-            <h2 className="text-4xl font-bold text-white mb-4">Everything you need for document AI</h2>
-            <p className="text-slate-400 text-lg max-w-2xl mx-auto">
-              A complete pipeline from upload to structured data, built on tools you already trust.
-            </p>
+            <h1 className={`text-base font-bold tracking-tight ${isLight ? 'text-slate-800' : 'text-white'}`}>Login</h1>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {FEATURES.map(({ icon: Icon, title, desc, color, bg }) => (
-              <div
-                key={title}
-                className="card hover:border-slate-700 transition-all duration-300 hover:-translate-y-1 group"
-              >
-                <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center mb-4`}>
-                  <Icon size={20} className={color} />
-                </div>
-                <h3 className="font-semibold text-white mb-2">{title}</h3>
-                <p className="text-slate-400 text-sm leading-relaxed">{desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+          <form onSubmit={handleLogin} className="space-y-3.5">
+            {/* Email */}
+            <div>
+              <label className={`block text-xs font-medium mb-1.5 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+                Email (Organization)
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+                className={inputCls}
+              />
+            </div>
 
-      {/* How it works */}
-      <section id="how-it-works" className="py-24 px-6 bg-slate-900/30">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-16">
-            <p className="text-brand-400 text-sm font-semibold uppercase tracking-widest mb-3">How it works</p>
-            <h2 className="text-4xl font-bold text-white mb-4">From file to data in 4 steps</h2>
-          </div>
-
-          <div className="grid md:grid-cols-4 gap-6">
-            {STEPS.map(({ num, title, desc }, i) => (
-              <div key={num} className="relative text-center">
-                {i < STEPS.length - 1 && (
-                  <div className="hidden md:block absolute top-6 left-3/4 w-1/2 h-px bg-gradient-to-r from-brand-600/40 to-transparent" />
-                )}
-                <div className="w-12 h-12 rounded-2xl bg-brand-600/20 border border-brand-500/20 flex items-center justify-center mx-auto mb-4">
-                  <span className="text-brand-300 font-bold text-sm">{num}</span>
-                </div>
-                <h3 className="font-semibold text-white mb-2">{title}</h3>
-                <p className="text-slate-400 text-sm">{desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Banner */}
-      <section className="py-24 px-6">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="card border-brand-500/20 bg-brand-600/5 relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-brand-600/10 to-purple-600/5 pointer-events-none" />
-            <div className="relative">
-              <h2 className="text-4xl font-bold text-white mb-4">Ready to automate your invoices?</h2>
-              <p className="text-slate-300 text-lg mb-8">
-                Connect your n8n, point to your Supabase, and start scanning in minutes.
-              </p>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            {/* Password */}
+            <div>
+              <label className={`block text-xs font-medium mb-1.5 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPw ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  className={inputCls + ' pr-10'}
+                />
                 <button
-                  onClick={() => navigate('/app/upload')}
-                  className="btn-primary flex items-center gap-2"
+                  type="button"
+                  onClick={() => setShowPw(p => !p)}
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 ${isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-500 hover:text-slate-300'}`}
                 >
-                  <Zap size={18} />
-                  Launch OCR Platform
+                  {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
-                <a
-                  href="https://github.com/wallapsu-data/CustomAI"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-secondary flex items-center gap-2"
-                >
-                  <Github size={18} />
-                  View Source
-                </a>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
 
-      {/* Footer */}
-      <footer className="py-10 px-6 border-t border-white/5 text-center text-slate-500 text-sm">
-        <div className="flex items-center justify-center gap-2 mb-3">
-          <div className="w-6 h-6 rounded bg-brand-600/80 flex items-center justify-center">
-            <Zap size={12} className="text-white" />
+            {error && (
+              <p className="text-red-500 text-[11px] font-medium">{error}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full btn-primary text-xs py-2.5 flex items-center justify-center gap-2 mt-1"
+            >
+              {loading && <Loader2 size={13} className="animate-spin" />}
+              Log In
+            </button>
+          </form>
+
+          {/* Links */}
+          <div className="flex justify-between mt-4 pt-3.5 border-t border-slate-100 dark:border-slate-700/60">
+            <button
+              onClick={() => setShowForgot(true)}
+              className={`text-[11px] font-semibold underline underline-offset-2 transition-colors ${isLight ? 'text-blue-500 hover:text-blue-700' : 'text-blue-400 hover:text-blue-300'}`}
+            >
+              Forgot Password
+            </button>
+            <button
+              onClick={() => setShowRegister(true)}
+              className={`text-[11px] font-semibold underline underline-offset-2 transition-colors ${isLight ? 'text-blue-500 hover:text-blue-700' : 'text-blue-400 hover:text-blue-300'}`}
+            >
+              Register account
+            </button>
           </div>
-          <span className="text-slate-400 font-medium">DocScan AI</span>
         </div>
-        <p>Built with React + Tailwind · n8n Automation · Supabase · Deployed on Vercel</p>
-        <p className="mt-1">
-          <a href="https://github.com/wallapsu-data/CustomAI" className="hover:text-slate-300 underline underline-offset-2">
-            github.com/wallapsu-data/CustomAI
-          </a>
-        </p>
-      </footer>
+      </div>
+
+      {/* Modals */}
+      {showRegister && <RegisterModal isLight={isLight} onClose={() => setShowRegister(false)} />}
+      {showForgot   && <ForgotPasswordModal isLight={isLight} onClose={() => setShowForgot(false)} />}
     </div>
   )
 }
