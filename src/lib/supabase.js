@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { getCurrentUser } from './auth.js'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://yhpxqnkcltdocwqrcbcv.supabase.co'
 // anon key is public — safe to commit
@@ -27,6 +28,7 @@ export async function uploadDocument(file, userId = 'anonymous') {
 
 // Save document record to DB
 export async function createDocumentRecord({ fileName, fileSize, fileType, storagePath, publicUrl }) {
+  const userEmail = getCurrentUser()?.email ?? null
   const { data, error } = await supabase
     .from('documents')
     .insert({
@@ -35,7 +37,8 @@ export async function createDocumentRecord({ fileName, fileSize, fileType, stora
       file_type: fileType,
       storage_path: storagePath,
       public_url: publicUrl,
-      status: 'uploaded'
+      status: 'uploaded',
+      user_email: userEmail,
     })
     .select()
     .single()
@@ -72,14 +75,18 @@ export async function getWorkflowRun(runId) {
   return data
 }
 
-// Get all documents (history)
+// Get documents — scoped to the logged-in user
 export async function getDocuments(limit = 20) {
-  const { data, error } = await supabase
+  const userEmail = getCurrentUser()?.email ?? null
+  let query = supabase
     .from('documents')
     .select('*, workflow_runs(id, status, created_at), ocr_results(id)')
     .order('created_at', { ascending: false })
     .limit(limit)
 
+  if (userEmail) query = query.eq('user_email', userEmail)
+
+  const { data, error } = await query
   if (error) throw error
   return data
 }
