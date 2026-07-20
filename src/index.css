@@ -280,22 +280,31 @@
 }
 .dropzone-active { @apply border-brand-400 bg-brand-900/20; }
 
-/* History item row yellow tint in light mode */
-[data-theme="light"] .history-row {
-  background-color: rgba(254, 243, 199, 0.70) !important;
-  border-color: rgba(251, 191, 36, 0.35) !important;
+/* Matching history row: white/light bg; icon+badge get yellow accent via JS classes */
+[data-theme="light"] .matching-row {
+  background-color: #ffffff !important;
+  border-color: rgba(203, 213, 225, 0.80) !important;
 }
-[data-theme="light"] .history-row:hover {
-  background-color: rgba(253, 230, 138, 0.85) !important;
-  border-color: rgba(251, 191, 36, 0.55) !important;
+[data-theme="light"] .matching-row:hover {
+  background-color: #f8fafc !important;
 }
-/* Dark mode: subtle warm tint */
-[data-theme="dark"] .history-row {
-  background-color: rgba(120, 80, 10, 0.12) !important;
-  border-color: rgba(180, 130, 30, 0.18) !important;
+/* Yellow icon circle in matching rows */
+[data-theme="light"] .matching-icon-wrap {
+  background-color: rgba(251, 191, 36, 0.25) !important;
 }
-[data-theme="dark"] .history-row:hover {
-  background-color: rgba(140, 100, 15, 0.20) !important;
+[data-theme="dark"] .matching-icon-wrap {
+  background-color: rgba(251, 191, 36, 0.18) !important;
+}
+/* Yellow badge background (combo type tag) */
+[data-theme="light"] .matching-badge {
+  background-color: rgba(253, 224, 71, 0.40) !important;
+  border-color: rgba(234, 179, 8, 0.50) !important;
+  color: #78350f !important;
+}
+[data-theme="dark"] .matching-badge {
+  background-color: rgba(253, 224, 71, 0.15) !important;
+  border-color: rgba(234, 179, 8, 0.35) !important;
+  color: #fde047 !important;
 }
 
 @keyframes ping-slow { 75%,100% { transform:scale(1.8); opacity:0; } }

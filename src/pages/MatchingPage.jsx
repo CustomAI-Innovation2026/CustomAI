@@ -425,6 +425,18 @@ function buildMultiDocTableFromPairs(pairs, comboTypes, fileIdx = 0) {
   })
 }
 
+// Find outlier cell keys for a mismatch row (3+ doc cols)
+function getMismatchCellKeys(f, colDefs) {
+  if (!f.values || colDefs.length < 3) return new Set()
+  const vals = colDefs.map(col => normalize(f.values[col.key] ?? ''))
+  // find mode (most common value)
+  const freq = {}
+  vals.forEach(v => { if (v) freq[v] = (freq[v] || 0) + 1 })
+  const mode = Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0]
+  if (!mode) return new Set()
+  return new Set(colDefs.filter((col, i) => vals[i] && vals[i] !== mode).map(col => col.key))
+}
+
 // Shared table renderer — multi-doc (N columns) or pair (2 columns)
 function CompareTable({ fields, colDefs, isLight }) {
   const bc      = isLight ? '#e2e8f0' : '#1e293b'
@@ -432,6 +444,7 @@ function CompareTable({ fields, colDefs, isLight }) {
   const subCls  = isLight ? 'text-slate-500' : 'text-slate-400'
   const valCls  = isLight ? 'text-slate-800'  : 'text-white'
   const nilCls  = isLight ? 'text-slate-400 italic' : 'text-slate-600 italic'
+  const isMulti = colDefs.length >= 3
 
   const STATUS_CFG = {
     match:       { text: '✓ Match',    cls: 'bg-green-500/15 text-green-400 border border-green-500/30' },
@@ -485,20 +498,43 @@ function CompareTable({ fields, colDefs, isLight }) {
                 </td>
               </tr>
               {sFields.map((f, fi) => {
-                const rowBg = f.status === 'mismatch'
-                  ? (isLight ? 'bg-red-50/50' : 'bg-red-500/5')
+                const isMismatch = f.status === 'mismatch'
+                const isMatch    = f.status === 'match' || f.status === 'fuzzy_match'
+                // Row background: 15% opacity shade
+                const rowBg = isMismatch
+                  ? (isLight ? 'bg-red-500/[0.06]'   : 'bg-red-500/[0.08]')
+                  : isMatch
+                  ? (isLight ? 'bg-green-500/[0.06]' : 'bg-green-500/[0.08]')
                   : ''
+                // Outlier cells for 3+ doc types
+                const outlierKeys = (isMismatch && isMulti) ? getMismatchCellKeys(f, colDefs) : new Set()
                 const sCfg = STATUS_CFG[f.status] ?? STATUS_CFG.empty
                 return (
-                  <tr key={fi} className={`border-b ${rowBg} ${isLight ? 'border-slate-100 hover:bg-slate-50' : 'border-slate-800/60 hover:bg-slate-800/20'}`}>
+                  <tr key={fi} className={`border-b ${rowBg} ${isLight ? 'border-slate-100 hover:bg-slate-50/80' : 'border-slate-800/60 hover:bg-slate-800/20'}`}>
                     <td className={`px-3 py-2 text-[11px] font-semibold border-r align-top ${subCls}`} style={{ borderColor: bc }}>
                       {f.field ?? f.label}
                     </td>
                     {colDefs.map(col => {
                       const val = f.values ? f.values[col.key] : (col.key === 'left' ? f.leftVal : f.rightVal)
+                      const isOutlier = outlierKeys.has(col.key)
                       return (
-                        <td key={col.key} className="px-3 py-2 text-[11px] border-r align-top" style={{ borderColor: bc }}>
-                          <span className={val ? valCls : nilCls}>{val || '—'}</span>
+                        <td key={col.key} className="px-2 py-2 text-[11px] border-r align-top" style={{ borderColor: bc }}>
+                          {isOutlier ? (
+                            <div style={{
+                              border: '1.5px dashed #ef4444',
+                              borderRadius: 6,
+                              background: isLight ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.12)',
+                              padding: '3px 6px',
+                              display: 'inline-block',
+                              minWidth: '80%',
+                            }}>
+                              <span className={val ? (isLight ? 'text-red-700 font-medium' : 'text-red-300 font-medium') : nilCls}>
+                                {val || '—'}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className={val ? valCls : nilCls}>{val || '—'}</span>
+                          )}
                         </td>
                       )
                     })}

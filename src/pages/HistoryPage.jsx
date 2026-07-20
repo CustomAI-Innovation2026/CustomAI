@@ -114,7 +114,7 @@ function OcrHistoryTab({ search }) {
           <div
             key={doc.id}
             onClick={() => hasResults && navigate(`/app/results/${doc.id}`)}
-            className={`history-row flex items-center gap-4 p-4 rounded-2xl border bg-slate-900/60 transition-all duration-200 ${
+            className={`flex items-center gap-4 p-4 rounded-2xl border bg-slate-900/60 transition-all duration-200 ${
               hasResults
                 ? 'cursor-pointer hover:bg-slate-800/60 hover:border-slate-700 border-slate-800'
                 : 'border-slate-800/60 opacity-70'
@@ -225,21 +225,21 @@ function MatchingHistoryTab({ search }) {
             <div
               key={entry.id}
               onClick={() => viewEntry(entry)}
-              className="history-row flex items-center gap-4 p-4 rounded-2xl border cursor-pointer
+              className="matching-row flex items-center gap-4 p-4 rounded-2xl border cursor-pointer
                 bg-white/8 border-slate-700/60
                 hover:bg-white/12 hover:border-slate-600/80
                 transition-all duration-200 group"
             >
-              {/* Icon */}
-              <div className="w-10 h-10 rounded-xl bg-slate-700/70 flex items-center justify-center flex-shrink-0">
-                <GitCompare size={18} className="text-slate-300" />
+              {/* Icon — yellow wrap, dark icon */}
+              <div className="matching-icon-wrap w-10 h-10 rounded-xl bg-slate-700/70 flex items-center justify-center flex-shrink-0">
+                <GitCompare size={18} className="text-slate-600" />
               </div>
 
               {/* Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
                   <p className="font-semibold text-white text-sm truncate">{entry.comboLabel}</p>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-700/60 text-slate-300 border border-slate-600/50 font-medium flex-shrink-0">
+                  <span className="matching-badge text-[10px] px-1.5 py-0.5 rounded-full bg-slate-700/60 text-slate-300 border border-slate-600/50 font-medium flex-shrink-0">
                     {typeLabels}
                   </span>
                 </div>
