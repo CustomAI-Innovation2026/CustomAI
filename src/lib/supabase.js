@@ -118,6 +118,25 @@ export async function getOcrResult(documentId) {
   return data
 }
 
+// n8n execution logs (stored permanently in Supabase via n8n HTTP node)
+// Table: n8n_executions (id TEXT PK, workflow_id TEXT, workflow_name TEXT,
+//   status TEXT, started_at TIMESTAMPTZ, finished_at TIMESTAMPTZ,
+//   duration_ms INT, user_email TEXT, created_at TIMESTAMPTZ DEFAULT NOW())
+export async function getN8nExecutions({ workflowId, startDate, endDate } = {}) {
+  let q = supabase
+    .from('n8n_executions')
+    .select('*')
+    .order('started_at', { ascending: false })
+    .limit(500)
+  if (workflowId) q = q.eq('workflow_id', workflowId)
+  if (startDate) q = q.gte('started_at', startDate + 'T00:00:00')
+  if (endDate)   q = q.lte('started_at', endDate   + 'T23:59:59')
+  const { data, error } = await q
+  // Table might not exist yet — return empty instead of crashing
+  if (error) return []
+  return data ?? []
+}
+
 // Subscribe to workflow run updates (realtime)
 export function subscribeToWorkflowRun(runId, callback) {
   return supabase

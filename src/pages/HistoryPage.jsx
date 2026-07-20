@@ -274,10 +274,12 @@ export default function HistoryPage() {
   const [tab, setTab] = useState('ocr')   // 'ocr' | 'matching'
   const [search, setSearch] = useState('')
   const [matchCount, setMatchCount] = useState(0)
+  const [ocrCount,   setOcrCount]   = useState(0)
 
   useEffect(() => {
     getMatchingHistory().then(data => setMatchCount(data.length))
-  }, [tab])
+    getDocuments(500).then(data => setOcrCount(data.length))
+  }, [])
 
   return (
     <div className="p-8">
@@ -315,6 +317,15 @@ export default function HistoryPage() {
         >
           <ScanLine size={14} />
           OCR Scans
+          {ocrCount > 0 && (
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${
+              tab === 'ocr'
+                ? 'bg-slate-600 text-slate-200'
+                : 'bg-slate-700 text-slate-400'
+            }`}>
+              {ocrCount}
+            </span>
+          )}
         </button>
         <button
           onClick={() => setTab('matching')}

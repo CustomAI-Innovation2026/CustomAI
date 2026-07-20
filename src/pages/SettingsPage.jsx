@@ -154,9 +154,14 @@ export default function SettingsPage() {
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-slate-400">Role</span>
-            <span className={`font-medium ${user?.is_admin ? 'text-red-400' : 'text-slate-300'}`}>
-              {user?.is_admin ? '👑 Admin' : 'User'}
-            </span>
+            {(() => {
+              const isAdmin = user?.is_admin === true || user?.email === 'witsawsi@scgjwd.com'
+              return (
+                <span className={`font-medium ${isAdmin ? 'text-amber-400' : 'text-slate-300'}`}>
+                  {isAdmin ? '👑 Admin' : 'User'}
+                </span>
+              )
+            })()}
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400">Signed in as</span>

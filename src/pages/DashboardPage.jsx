@@ -2,9 +2,9 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Upload, FileText, CheckCircle2, XCircle, GitCompare,
-  ArrowRight, Loader2, TrendingUp, Users, ChevronDown, History
+  ArrowRight, Loader2, TrendingUp, Users, ChevronDown, History, Activity
 } from 'lucide-react'
-import { getDocuments, getDocumentsAdmin } from '../lib/supabase.js'
+import { getDocuments, getDocumentsAdmin, getN8nExecutions } from '../lib/supabase.js'
 import { getMatchingHistory, getMatchingHistoryAdmin } from '../lib/matchingHistory.js'
 import { getCurrentUser, getAppUsers } from '../lib/auth.js'
 
@@ -21,17 +21,17 @@ function daysInMonth(year, month) { return new Date(year, month + 1, 0).getDate(
 // ── KPI Card ──────────────────────────────────────────────────
 function KpiCard({ icon: Icon, label, value, sub, accent }) {
   const accentMap = {
-    blue:   { bg: 'bg-blue-500/12',   text: 'text-blue-500',   icon: 'text-blue-400' },
-    green:  { bg: 'bg-green-500/12',  text: 'text-green-500',  icon: 'text-green-400' },
-    red:    { bg: 'bg-red-500/12',    text: 'text-red-500',    icon: 'text-red-400' },
-    amber:  { bg: 'bg-amber-500/12',  text: 'text-amber-500',  icon: 'text-amber-400' },
-    purple: { bg: 'bg-purple-500/12', text: 'text-purple-500', icon: 'text-purple-400' },
+    blue:   { bg: 'bg-blue-500/20',   border: 'border-blue-500/25',   text: 'text-blue-400',   icon: 'text-blue-300' },
+    green:  { bg: 'bg-green-500/20',  border: 'border-green-500/25',  text: 'text-green-400',  icon: 'text-green-300' },
+    red:    { bg: 'bg-red-500/20',    border: 'border-red-500/25',    text: 'text-red-400',    icon: 'text-red-300' },
+    amber:  { bg: 'bg-amber-500/20',  border: 'border-amber-500/25',  text: 'text-amber-400',  icon: 'text-amber-300' },
+    purple: { bg: 'bg-purple-500/20', border: 'border-purple-500/25', text: 'text-purple-400', icon: 'text-purple-300' },
   }
   const c = accentMap[accent] || accentMap.blue
   return (
-    <div className="card flex items-start gap-3 min-w-0 p-4">
-      <div className={`w-9 h-9 rounded-lg ${c.bg} flex items-center justify-center flex-shrink-0`}>
-        <Icon size={16} className={c.icon} />
+    <div className="card flex items-center gap-4 min-w-0 p-4">
+      <div className={`w-12 h-12 rounded-xl ${c.bg} border ${c.border} flex items-center justify-center flex-shrink-0`}>
+        <Icon size={22} className={c.icon} />
       </div>
       <div className="min-w-0 flex-1">
         <p className={`text-2xl font-black ${c.text} leading-tight tabular-nums`}>{value}</p>
@@ -167,11 +167,11 @@ function DonutChart({ matchCount, mismatchCount }) {
         <circle cx={CX} cy={CY} r={R} fill="none" stroke={SCGJWD_ORANGE} strokeWidth={SW}
           strokeDasharray={xA.strokeDasharray} strokeDashoffset={xA.strokeDashoffset}
           strokeLinecap="butt" transform={`rotate(-90 ${CX} ${CY})`} />
-        {/* Center text — intense, visible */}
-        <text x={CX} y={CY - 8} textAnchor="middle" fill="currentColor" fontSize={26} fontWeight="900"
-          style={{ fill: 'var(--text-primary, #0a1628)' }}>{total}</text>
-        <text x={CX} y={CY + 8}  textAnchor="middle" fontSize={10} style={{ fill: '#64748b' }}>Total</text>
-        <text x={CX} y={CY + 20} textAnchor="middle" fontSize={10} style={{ fill: '#64748b' }}>Compare</text>
+        {/* White circle bg so center text is always legible */}
+        <circle cx={CX} cy={CY} r={R - SW / 2 - 2} fill="white" opacity="0.92" />
+        <text x={CX} y={CY - 8} textAnchor="middle" fontSize={26} fontWeight="900" style={{ fill: '#0f172a' }}>{total}</text>
+        <text x={CX} y={CY + 8}  textAnchor="middle" fontSize={10} style={{ fill: '#475569' }}>Total</text>
+        <text x={CX} y={CY + 20} textAnchor="middle" fontSize={10} style={{ fill: '#475569' }}>Compare</text>
       </svg>
       <div className="space-y-3 flex-1 min-w-0">
         <div className="flex items-start gap-2">
@@ -271,26 +271,62 @@ function DocTypeBarChart({ matchHistory }) {
 }
 
 // ── Pipeline Stats Modal (admin) ───────────────────────────────
+const WORKFLOWS = [
+  { id: 'qN5KDFqloUJjyS28', name: 'OCR Workflow',      icon: '🔍' },
+  { id: 'KQE9Dcfka2IDDVqd', name: 'Matching Workflow', icon: '🔄' },
+]
+
 function PipelineStatsModal({ onClose }) {
   const [startDate, setStartDate] = useState(() => {
     const d = new Date(); d.setMonth(d.getMonth() - 1); return isoDate(d)
   })
   const [endDate, setEndDate] = useState(isoDate(new Date()))
+  const [activeWf, setActiveWf] = useState(WORKFLOWS[0].id)
+  const [execs, setExecs] = useState([])
+  const [loadingExecs, setLoadingExecs] = useState(false)
+
+  useEffect(() => {
+    setLoadingExecs(true)
+    getN8nExecutions({ workflowId: activeWf, startDate, endDate })
+      .then(setExecs)
+      .finally(() => setLoadingExecs(false))
+  }, [activeWf, startDate, endDate])
 
   const daysDiff   = Math.max(0, Math.round((new Date(endDate) - new Date(startDate)) / 86400000))
   const monthsDiff = Math.round(daysDiff / 30 * 10) / 10
 
+  const succeed = execs.filter(e => e.status === 'success').length
+  const errored = execs.filter(e => e.status === 'error').length
+  const running = execs.filter(e => e.status === 'running').length
+
+  const hasData = execs.length > 0
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="card w-full max-w-2xl mx-4 relative" onClick={e => e.stopPropagation()}>
+      <div className="card w-full max-w-2xl mx-4 relative max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white text-lg leading-none">✕</button>
         <div className="flex items-center gap-2 mb-1">
-          <TrendingUp size={18} className="text-red-400" />
+          <Activity size={18} className="text-green-400" />
           <h2 className="font-bold text-white text-lg">n8n Pipeline Stats</h2>
         </div>
-        <p className="text-slate-400 text-sm mb-5">Monitor workflow execution metrics</p>
+        <p className="text-slate-400 text-sm mb-4">Monitor workflow execution metrics</p>
 
-        <div className="flex items-center gap-3 mb-6 flex-wrap">
+        {/* Workflow tabs */}
+        <div className="flex gap-2 mb-4">
+          {WORKFLOWS.map(wf => (
+            <button key={wf.id} onClick={() => setActiveWf(wf.id)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                activeWf === wf.id
+                  ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+                  : 'text-slate-400 hover:text-slate-200 border border-slate-700/50'
+              }`}>
+              {wf.icon} {wf.name}
+            </button>
+          ))}
+        </div>
+
+        {/* Date range */}
+        <div className="flex items-center gap-3 mb-5 flex-wrap">
           <div className="flex items-center gap-2">
             <span className="text-slate-400 text-sm">Start:</span>
             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
@@ -304,46 +340,79 @@ function PipelineStatsModal({ onClose }) {
           <span className="text-slate-500 text-sm font-medium">{daysDiff} days / {monthsDiff} months</span>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        {/* KPI cards */}
+        <div className="grid grid-cols-3 gap-4 mb-5">
           {[
-            { label: '# Succeed', color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
-            { label: '# Error',   color: 'text-red-400',   bg: 'bg-red-500/10',   border: 'border-red-500/20' },
-            { label: '# Running', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
-          ].map(({ label, color, bg, border }) => (
+            { label: '# Succeed', value: hasData ? succeed : '—', color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
+            { label: '# Error',   value: hasData ? errored : '—', color: 'text-red-400',   bg: 'bg-red-500/10',   border: 'border-red-500/20' },
+            { label: '# Running', value: hasData ? running : '—', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
+          ].map(({ label, value, color, bg, border }) => (
             <div key={label} className={`rounded-xl p-4 ${bg} border ${border} text-center`}>
-              <p className={`text-3xl font-black ${color}`}>—</p>
+              <p className={`text-3xl font-black ${color}`}>{loadingExecs ? '…' : value}</p>
               <p className="text-slate-400 text-xs mt-1">{label}</p>
             </div>
           ))}
         </div>
 
-        <p className="text-slate-500 text-xs text-center">
-          Connect to n8n API to pull live execution metrics.{' '}
+        {/* Execution list */}
+        {hasData ? (
+          <div className="space-y-1.5 max-h-48 overflow-y-auto">
+            {execs.slice(0, 20).map(ex => (
+              <div key={ex.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-slate-800/50 text-sm">
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                  ex.status === 'success' ? 'bg-green-400' :
+                  ex.status === 'error'   ? 'bg-red-400' : 'bg-amber-400'}`} />
+                <span className="text-slate-300 flex-1 truncate">
+                  {ex.started_at ? new Date(ex.started_at).toLocaleString() : '—'}
+                </span>
+                <span className={`text-xs font-medium capitalize ${
+                  ex.status === 'success' ? 'text-green-400' :
+                  ex.status === 'error'   ? 'text-red-400' : 'text-amber-400'}`}>
+                  {ex.status}
+                </span>
+                {ex.duration_ms != null && (
+                  <span className="text-slate-500 text-xs">{(ex.duration_ms / 1000).toFixed(1)}s</span>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-slate-700 p-5 text-center">
+            <p className="text-slate-400 text-sm mb-1">No execution logs found</p>
+            <p className="text-slate-500 text-xs">
+              Configure n8n to save executions to Supabase <code className="text-green-400">n8n_executions</code> table via HTTP node at workflow end.
+            </p>
+          </div>
+        )}
+
+        <div className="mt-4 flex justify-end">
           <a href="https://n8n.scgjwd.com" target="_blank" rel="noopener noreferrer"
-            className="text-blue-400 hover:underline">Open n8n Dashboard →</a>
-        </p>
+            className="text-xs text-blue-400 hover:underline flex items-center gap-1">
+            Open n8n Dashboard <ArrowRight size={11} />
+          </a>
+        </div>
       </div>
     </div>
   )
 }
 
 // ── Quick Start Item ───────────────────────────────────────────
-function QuickItem({ icon: Icon, iconBg, iconColor, title, desc, onClick, dashed, arrow }) {
+function QuickItem({ icon: Icon, iconBg, iconColor, title, desc, onClick, dashed }) {
   return (
     <button onClick={onClick}
       className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all text-left group
         ${dashed
-          ? 'border border-dashed border-red-500/50 bg-red-500/5 hover:bg-red-500/10'
+          ? 'border border-dashed border-green-500/50 bg-green-500/5 hover:bg-green-500/10'
           : 'border border-transparent hover:border-slate-700/50 hover:bg-slate-800/50'}`}
     >
       <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${iconBg}`}>
         <Icon size={16} className={iconColor} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className={`text-sm font-medium leading-tight ${dashed ? 'text-red-200' : 'text-white'}`}>{title}</p>
-        <p className={`text-xs mt-0.5 ${dashed ? 'text-red-500/70' : 'text-slate-500'}`}>{desc}</p>
+        <p className="text-sm font-medium leading-tight text-white">{title}</p>
+        <p className="text-xs mt-0.5 text-slate-500">{desc}</p>
       </div>
-      <ArrowRight size={13} className={`flex-shrink-0 ${dashed ? 'text-red-600 group-hover:text-red-400' : 'text-slate-600 group-hover:text-slate-400'}`} />
+      <ArrowRight size={13} className="flex-shrink-0 text-slate-600 group-hover:text-slate-400" />
     </button>
   )
 }
@@ -462,27 +531,27 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── Heatmap (expanded, full width) ─────────────────── */}
+      {/* ── Middle row: Heatmap (2/3) + Charts stacked (1/3) ── */}
       {!loading && (
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-white text-sm">Document Matching Usage Overview</h2>
-            <span className="text-slate-500 text-xs">{new Date().getFullYear()} YTD</span>
+        <div className="grid lg:grid-cols-3 gap-4">
+          {/* Heatmap — col-span-2 */}
+          <div className="card lg:col-span-2">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-white text-sm">Document Matching Usage Overview</h2>
+              <span className="text-slate-500 text-xs">{new Date().getFullYear()} YTD</span>
+            </div>
+            <HeatmapChart docs={docs} matchHistory={matchHistory} />
           </div>
-          <HeatmapChart docs={docs} matchHistory={matchHistory} />
-        </div>
-      )}
-
-      {/* ── Documents Summary + Analysis ───────────────────── */}
-      {!loading && (
-        <div className="grid lg:grid-cols-2 gap-4">
-          <div className="card">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Documents Summary</p>
-            <DonutChart matchCount={matchCount} mismatchCount={mismatchCount} />
-          </div>
-          <div className="card">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Analysis by Doc Type</p>
-            <DocTypeBarChart matchHistory={filteredHistory} />
+          {/* Right column — donut + bar stacked */}
+          <div className="flex flex-col gap-4">
+            <div className="card flex-1">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Documents Summary</p>
+              <DonutChart matchCount={matchCount} mismatchCount={mismatchCount} />
+            </div>
+            <div className="card flex-1">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Analysis by Doc Type</p>
+              <DocTypeBarChart matchHistory={filteredHistory} />
+            </div>
           </div>
         </div>
       )}
@@ -542,11 +611,11 @@ export default function DashboardPage() {
                 onClick={() => navigate('/app/upload')}
               />
 
-              {/* 2. Upload Document Matching — black/grey text, no yellow */}
+              {/* 2. Upload Document Matching — amber/yellow style */}
               <QuickItem
                 icon={GitCompare}
-                iconBg="bg-slate-700/60"
-                iconColor="text-slate-300"
+                iconBg="bg-amber-400/20"
+                iconColor="text-amber-400"
                 title="Upload Document Matching"
                 desc="Compare data fields among 4 document types (BL, INV, PL, Form)"
                 onClick={() => navigate('/app/matching')}
@@ -562,12 +631,12 @@ export default function DashboardPage() {
                 onClick={() => navigate('/app/history')}
               />
 
-              {/* 4. Pipeline Stats — admin only, red dashed */}
+              {/* 4. Pipeline Stats — admin only, green dashed */}
               {isAdmin && (
                 <QuickItem
-                  icon={TrendingUp}
-                  iconBg="bg-red-500/20"
-                  iconColor="text-red-300"
+                  icon={Activity}
+                  iconBg="bg-green-500/20"
+                  iconColor="text-green-400"
                   title="Pipeline Stats"
                   desc="Monitor n8n workflow execution metrics"
                   onClick={() => setShowPipeline(true)}
