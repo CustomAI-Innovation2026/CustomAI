@@ -79,8 +79,7 @@ function HeatmapChart({ docs, matchHistory }) {
     return 'rgba(46,125,212,0.95)'
   }
 
-  // Bigger cells
-  const CELL = 20, GAP = 3, LABEL_W = 34, DAYS = 31
+  const CELL = 24, GAP = 3, LABEL_W = 34, DAYS = 31
 
   return (
     <div className="overflow-x-auto">
@@ -146,7 +145,7 @@ function DonutChart({ matchCount, mismatchCount }) {
   const matchPct    = Math.round(matchCount    / total * 1000) / 10
   const mismatchPct = Math.round(mismatchCount / total * 1000) / 10
 
-  const R = 56, CX = 76, CY = 76, SW = 22
+  const R = 52, CX = 64, CY = 64, SW = 20
   function arc(pct, offset) {
     const circ = 2 * Math.PI * R
     return { strokeDasharray: `${pct / 100 * circ} ${circ}`, strokeDashoffset: -offset / 100 * circ }
@@ -155,40 +154,38 @@ function DonutChart({ matchCount, mismatchCount }) {
   const xA = arc(mismatchPct, matchPct)
 
   return (
-    <div className="flex items-center gap-5">
-      <svg width={152} height={152} viewBox="0 0 152 152" style={{ flexShrink: 0 }}>
-        {/* Track */}
+    <div className="flex items-center gap-4">
+      {/* Donut */}
+      <svg width={128} height={128} viewBox="0 0 128 128" style={{ flexShrink: 0 }}>
         <circle cx={CX} cy={CY} r={R} fill="none" stroke="rgba(100,130,180,0.10)" strokeWidth={SW} />
-        {/* Match arc — SCGJWD blue */}
         <circle cx={CX} cy={CY} r={R} fill="none" stroke={SCGJWD_BLUE} strokeWidth={SW}
           strokeDasharray={mA.strokeDasharray} strokeDashoffset={mA.strokeDashoffset}
           strokeLinecap="butt" transform={`rotate(-90 ${CX} ${CY})`} />
-        {/* Mismatch arc — SCGJWD orange */}
         <circle cx={CX} cy={CY} r={R} fill="none" stroke={SCGJWD_ORANGE} strokeWidth={SW}
           strokeDasharray={xA.strokeDasharray} strokeDashoffset={xA.strokeDashoffset}
           strokeLinecap="butt" transform={`rotate(-90 ${CX} ${CY})`} />
-        {/* White circle bg so center text is always legible */}
         <circle cx={CX} cy={CY} r={R - SW / 2 - 2} fill="white" opacity="0.92" />
-        <text x={CX} y={CY - 8} textAnchor="middle" fontSize={26} fontWeight="900" style={{ fill: '#0f172a' }}>{total}</text>
-        <text x={CX} y={CY + 8}  textAnchor="middle" fontSize={10} style={{ fill: '#475569' }}>Total</text>
-        <text x={CX} y={CY + 20} textAnchor="middle" fontSize={10} style={{ fill: '#475569' }}>Compare</text>
+        <text x={CX} y={CY - 6} textAnchor="middle" fontSize={22} fontWeight="900" style={{ fill: '#0f172a' }}>{total}</text>
+        <text x={CX} y={CY + 9}  textAnchor="middle" fontSize={9} style={{ fill: '#475569' }}>Total</text>
+        <text x={CX} y={CY + 19} textAnchor="middle" fontSize={9} style={{ fill: '#475569' }}>Compare</text>
       </svg>
-      <div className="space-y-3 flex-1 min-w-0">
-        <div className="flex items-start gap-2">
-          <div className="w-3 h-3 rounded-sm mt-0.5 flex-shrink-0" style={{ background: SCGJWD_BLUE }} />
-          <div>
-            <p className="text-xs text-slate-400 font-medium leading-tight">Match (100%)</p>
-            <p className="text-base font-black" style={{ color: SCGJWD_BLUE }}>
-              {matchCount} <span className="text-xs font-normal text-slate-500">({matchPct}%)</span>
+      {/* Legend — pushed right */}
+      <div className="space-y-2 flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: SCGJWD_BLUE }} />
+          <div className="min-w-0">
+            <p className="text-[11px] text-slate-400 font-medium leading-tight">Match</p>
+            <p className="text-base font-black leading-tight" style={{ color: SCGJWD_BLUE }}>
+              {matchCount} <span className="text-[11px] font-normal text-slate-500">({matchPct}%)</span>
             </p>
           </div>
         </div>
-        <div className="flex items-start gap-2">
-          <div className="w-3 h-3 rounded-sm mt-0.5 flex-shrink-0" style={{ background: SCGJWD_ORANGE }} />
-          <div>
-            <p className="text-xs text-slate-400 font-medium leading-tight">Mismatch</p>
-            <p className="text-base font-black" style={{ color: SCGJWD_ORANGE }}>
-              {mismatchCount} <span className="text-xs font-normal text-slate-500">({mismatchPct}%)</span>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: SCGJWD_ORANGE }} />
+          <div className="min-w-0">
+            <p className="text-[11px] text-slate-400 font-medium leading-tight">Mismatch</p>
+            <p className="text-base font-black leading-tight" style={{ color: SCGJWD_ORANGE }}>
+              {mismatchCount} <span className="text-[11px] font-normal text-slate-500">({mismatchPct}%)</span>
             </p>
           </div>
         </div>

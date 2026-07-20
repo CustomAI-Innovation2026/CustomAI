@@ -320,8 +320,8 @@ export default function HistoryPage() {
           {ocrCount > 0 && (
             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${
               tab === 'ocr'
-                ? 'bg-slate-600 text-slate-200'
-                : 'bg-slate-700 text-slate-400'
+                ? 'bg-slate-300 text-slate-700'
+                : 'bg-slate-700/60 text-slate-400'
             }`}>
               {ocrCount}
             </span>
@@ -340,8 +340,8 @@ export default function HistoryPage() {
           {matchCount > 0 && (
             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${
               tab === 'matching'
-                ? 'bg-slate-600 text-slate-200'
-                : 'bg-slate-700 text-slate-400'
+                ? 'bg-slate-300 text-slate-700'
+                : 'bg-slate-700/60 text-slate-400'
             }`}>
               {matchCount}
             </span>
