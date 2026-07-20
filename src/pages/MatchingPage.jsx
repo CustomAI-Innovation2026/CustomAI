@@ -1,8 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   GitCompare, Plus, X, CheckCircle2, XCircle, MinusCircle,
-  FileText, Loader2, Upload, AlertCircle, Image, File, ChevronDown
+  FileText, Loader2, Upload, AlertCircle, Image, File
 } from 'lucide-react'
 import { useTheme } from '../lib/theme.jsx'
 import {
@@ -34,26 +34,13 @@ const COLOR_MAP_LIGHT = {
   violet: { active: 'border-violet-500 bg-violet-50 text-violet-700', inactive: 'border-slate-300 text-slate-400' },
 }
 
-// Combination options — ordered by BL > INV > PL > FORM priority
-const COMBINATION_OPTIONS = {
-  2: [
-    { label: '1. BL vs Invoice',           types: ['bill_of_lading', 'invoice'] },
-    { label: '2. BL vs Packing List',       types: ['bill_of_lading', 'packing_list'] },
-    { label: '3. BL vs Form',              types: ['bill_of_lading', 'form_d'] },
-    { label: '4. Invoice vs Packing List',  types: ['invoice', 'packing_list'] },
-    { label: '5. Invoice vs Form',          types: ['invoice', 'form_d'] },
-    { label: '6. Packing List vs Form',     types: ['packing_list', 'form_d'] },
-  ],
-  3: [
-    { label: '7. BL vs Invoice vs Packing List',    types: ['bill_of_lading', 'invoice', 'packing_list'] },
-    { label: '8. BL vs Invoice vs Form',             types: ['bill_of_lading', 'invoice', 'form_d'] },
-    { label: '9. BL vs Packing List vs Form',        types: ['bill_of_lading', 'packing_list', 'form_d'] },
-    { label: '10. Invoice vs Packing List vs Form',  types: ['invoice', 'packing_list', 'form_d'] },
-  ],
-  4: [
-    { label: '11. BL vs Invoice vs Packing List vs Form', types: ['bill_of_lading', 'invoice', 'packing_list', 'form_d'] },
-  ],
-}
+// Fixed panel config — one per doc type, always shown
+const PANEL_CONFIG = [
+  { docType: 'bill_of_lading', title: 'Bill of Lading Document', emoji: '🚢' },
+  { docType: 'invoice',        title: 'Invoice Document',         emoji: '🧾' },
+  { docType: 'packing_list',   title: 'Packing List Document',    emoji: '📦' },
+  { docType: 'form_d',         title: 'Form Document',            emoji: '📋' },
+]
 
 const MATCH_FIELDS = {
   bill_of_lading: [
@@ -697,8 +684,8 @@ function PanelColumn({ title, emoji, docType, files, isLight, disabled, onAddFil
       <div className={`px-3 pt-3 pb-2 border-b ${divider} flex-shrink-0`}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5">
-            <span className="text-sm">{emoji}</span>
-            <span className={`text-xs font-bold ${titleCls}`}>{title}</span>
+            <span className="text-base">{emoji}</span>
+            <span className={`text-sm font-bold leading-tight ${titleCls}`}>{title}</span>
           </div>
           <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
             isLight ? 'bg-slate-100 text-slate-500' : 'bg-slate-800 text-slate-400'
@@ -1175,11 +1162,10 @@ export default function MatchingPage() {
   const isLight = theme === 'light'
   const location = useLocation()
 
-  // Dropdown state
-  const [numDocs,       setNumDocs]       = useState(null)   // 2 | 3 | 4
-  const [selectedCombo, setSelectedCombo] = useState(null)   // { label, types }
-  // panels[i] = { docType: string, files: [] }
-  const [panels,        setPanels]        = useState([])
+  // panels: always 4 fixed (BL, INV, PL, FORM)
+  const [panels, setPanels] = useState(() =>
+    PANEL_CONFIG.map(cfg => ({ docType: cfg.docType, files: [] }))
+  )
   // Results
   const [matchResults,   setMatchResults]   = useState(null)
   const [activePairIdx,  setActivePairIdx]  = useState(-1)
@@ -1191,7 +1177,14 @@ export default function MatchingPage() {
   const [detailsOpen,    setDetailsOpen]    = useState(false)
   const [historyMode,    setHistoryMode]    = useState(false) // viewing a saved history entry
 
-  const isConfigured = numDocs !== null && selectedCombo !== null
+  // ── Derived: which panels have files → auto combo ─────────
+  const activeDocTypes = panels.filter(p => p.files.length > 0).map(p => p.docType)
+  const numDocs = activeDocTypes.length
+  const selectedCombo = numDocs >= 2 ? {
+    label: activeDocTypes.map(t => DOC_TYPES.find(d => d.id === t)?.short ?? t).join(' vs '),
+    types: activeDocTypes,
+  } : null
+  const completedPanels = panels.filter(p => p.files.some(f => f.status === 'completed' && f.data))
 
   // ── Restore from history navigation state ─────────────────
   useEffect(() => {
@@ -1199,12 +1192,11 @@ export default function MatchingPage() {
     if (!entry) return
     const { pairs, selectedCombo: combo, fileNames } = entry
     setMatchResults(pairs)
-    setSelectedCombo(combo)
-    setNumDocs(combo?.types?.length ?? 2)
-    // Build lightweight panels (no file data, just enough for labels)
-    setPanels((combo?.types ?? []).map(dt => ({
-      docType: dt,
-      files: (fileNames?.[dt] ?? []).map(name => ({
+    // Fill all 4 panels; only types in history get files
+    setPanels(PANEL_CONFIG.map(cfg => ({
+      docType: cfg.docType,
+      files: (fileNames?.[cfg.docType] ?? []).map(name => ({
+        id: Math.random(),
         file: { name },
         status: 'completed',
         data: {},
@@ -1214,30 +1206,8 @@ export default function MatchingPage() {
     setActiveGroupIdx(null)
     setActiveFileIdx(0)
     setHistoryMode(true)
-    // Clear location state so refresh doesn't re-apply it
     window.history.replaceState({}, '')
-  }, [location.state]) // re-run whenever navigation state changes (e.g. history entry clicked while already on this page)
-
-  // ── Dropdown handlers ──────────────────────────────────────
-  function handleNumDocsChange(n) {
-    setNumDocs(n)
-    setSelectedCombo(null)
-    setPanels([])
-    setMatchResults(null)
-  }
-
-  function handleComboChange(comboIdx) {
-    if (comboIdx === -1) {
-      setSelectedCombo(null)
-      setPanels([])
-      setMatchResults(null)
-      return
-    }
-    const combo = COMBINATION_OPTIONS[numDocs][comboIdx]
-    setSelectedCombo(combo)
-    setPanels(combo.types.map(docType => ({ docType, files: [] })))
-    setMatchResults(null)
-  }
+  }, [location.state])
 
   // ── File processing ────────────────────────────────────────
   async function processFiles(panelIdx, rawFiles) {
@@ -1345,8 +1315,17 @@ export default function MatchingPage() {
     return pairResults
   }
 
-  // ── Compare ─── always re-run OCR fresh, then fuzzy match ────
+  // ── Compare ─── 1-doc → view OCR result; 2+ → fuzzy match ──
   async function runCompare() {
+    // Single doc type: navigate to OCR result page
+    if (completedPanels.length === 1) {
+      const firstFile = completedPanels[0].files.find(f => f.status === 'completed' && f.docId)
+      if (firstFile?.docId) {
+        navigate(`/app/results/${firstFile.docId}`)
+      }
+      return
+    }
+
     setComparing(true)
     setAiComparing(false)
     setMatchResults(null)
@@ -1470,10 +1449,7 @@ export default function MatchingPage() {
     }
   }
 
-  const canCompare = isConfigured &&
-    panels.length >= 2 &&
-    panels[0].files.some(f => f.status === 'completed' && f.data) &&
-    panels.slice(1).some(p => p.files.some(f => f.status === 'completed' && f.data))
+  const canCompare = completedPanels.length >= 1
 
   const activePair     = matchResults?.[activePairIdx]
   const activeFilePair = activePair?.filePairs?.[activeFileIdx]
@@ -1483,37 +1459,16 @@ export default function MatchingPage() {
   const titleCls = isLight ? 'text-slate-900' : 'text-white'
   const subCls   = isLight ? 'text-slate-500' : 'text-slate-300'
   const divider  = isLight ? 'border-slate-100' : 'border-slate-700'
-  const selectCls = isLight
-    ? 'bg-white border-slate-300 text-slate-800 focus:border-brand-500'
-    : 'bg-slate-700 border-slate-500 text-slate-100 focus:border-brand-400'
-  const selectDisabledCls = isLight
-    ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-    : 'bg-slate-800/50 border-slate-700/50 text-slate-600 cursor-not-allowed'
-
-  // Panel grid config
-  const showBottomRow   = isConfigured && numDocs >= 3
-  const panelCount      = isConfigured ? numDocs : 2
-  const panelTitles     = ['Source Documents', 'Compare Documents', 'Compare Documents', 'Compare Documents']
-  const panelEmojis     = ['📂', '🔍', '🔍', '🔍']
-  const visibleIndices  = isConfigured
-    ? Array.from({ length: numDocs }, (_, i) => i)
-    : [0, 1]
-
-  const comboOptions = numDocs ? COMBINATION_OPTIONS[numDocs] : []
-  const selectedComboIdx = selectedCombo
-    ? comboOptions.findIndex(c => c.label === selectedCombo.label)
-    : -1
-
   // ── Panel renderer helper ────────────────────────────────────
-  const renderPanel = (panelIdx, disabled = false) => (
+  const renderPanel = (panelIdx) => (
     <PanelColumn
       key={panelIdx}
-      title={panelTitles[panelIdx]}
-      emoji={panelEmojis[panelIdx]}
+      title={PANEL_CONFIG[panelIdx].title}
+      emoji={PANEL_CONFIG[panelIdx].emoji}
       docType={panels[panelIdx]?.docType ?? null}
       files={panels[panelIdx]?.files ?? []}
       isLight={isLight}
-      disabled={disabled}
+      disabled={false}
       onAddFiles={files => processFiles(panelIdx, files)}
       onRemoveFile={i => removeFile(panelIdx, i)}
       onClearAll={() => clearFiles(panelIdx)}
@@ -1537,75 +1492,12 @@ export default function MatchingPage() {
       {/* ── Body: 2-col grid — left = dropdowns + panels, right = results ── */}
       <div className="flex-1 grid gap-4 min-h-0" style={{ gridTemplateColumns: '1fr 1.4fr' }}>
 
-        {/* ── LEFT COLUMN: dropdowns on top, panels fill remaining height ── */}
+        {/* ── LEFT COLUMN: 2×2 panel grid fills full height ── */}
         <div className="flex flex-col gap-2.5 min-h-0">
-
-          {/* Dropdowns row — constrained to left column width */}
-          <div className="flex gap-2.5 flex-shrink-0">
-            {/* Dropdown 1 — narrow fixed width */}
-            <div className="flex-shrink-0 w-48">
-              <p className={`text-[10px] font-semibold uppercase tracking-wider mb-1 ${subCls}`}>
-                No. of Document Type
-              </p>
-              <div className="relative">
-                <select
-                  value={numDocs ?? ''}
-                  onChange={e => handleNumDocsChange(e.target.value ? Number(e.target.value) : null)}
-                  className={`w-full appearance-none pl-3 pr-8 py-2 rounded-xl border text-sm font-medium transition-all outline-none cursor-pointer ${selectCls}`}
-                >
-                  <option value="">Select (2 / 3 / 4)</option>
-                  <option value="2">2 Document Types</option>
-                  <option value="3">3 Document Types</option>
-                  <option value="4">4 Document Types</option>
-                </select>
-                <ChevronDown size={13} className={`absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${subCls}`} />
-              </div>
-            </div>
-
-            {/* Dropdown 2 — fills remaining left-column space */}
-            <div className="flex-1 min-w-0">
-              <p className={`text-[10px] font-semibold uppercase tracking-wider mb-1 ${subCls}`}>
-                Document Types Matching Combination
-              </p>
-              <div className="relative">
-                <select
-                  value={selectedComboIdx === -1 ? '' : selectedComboIdx}
-                  onChange={e => handleComboChange(e.target.value === '' ? -1 : Number(e.target.value))}
-                  disabled={!numDocs}
-                  className={`w-full appearance-none pl-3 pr-8 py-2 rounded-xl border text-sm font-medium transition-all outline-none ${
-                    numDocs ? `cursor-pointer ${selectCls}` : selectDisabledCls
-                  }`}
-                >
-                  <option value="">Select Matching Combination</option>
-                  {comboOptions.map((combo, i) => (
-                    <option key={i} value={i}>{combo.label}</option>
-                  ))}
-                </select>
-                <ChevronDown size={13} className={`absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${numDocs ? subCls : 'text-slate-600'}`} />
-              </div>
-            </div>
-          </div>
-
-          {/* Panel grid — flex-1 so it fills all remaining height */}
           <div className="flex-1 min-h-0">
-            {isConfigured && numDocs === 3 ? (
-              /* 3-doc: Source spans full height left, 2 Compare stacked right */
-              <div className="h-full grid gap-2.5" style={{ gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr' }}>
-                <div style={{ gridRow: '1 / 3' }} className="min-h-0">{renderPanel(0)}</div>
-                {renderPanel(1)}
-                {renderPanel(2)}
-              </div>
-            ) : isConfigured && numDocs === 4 ? (
-              /* 4-doc: 2×2 grid */
-              <div className="h-full grid gap-2.5" style={{ gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr' }}>
-                {[0, 1, 2, 3].map(i => renderPanel(i))}
-              </div>
-            ) : (
-              /* 2-doc or pre-config: side by side */
-              <div className="h-full grid gap-2.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                {[0, 1].map(i => renderPanel(i, !isConfigured))}
-              </div>
-            )}
+            <div className="h-full grid gap-2.5" style={{ gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr' }}>
+              {[0, 1, 2, 3].map(i => renderPanel(i))}
+            </div>
           </div>
         </div>
 
@@ -1680,9 +1572,11 @@ export default function MatchingPage() {
               </div>
               <p className={`font-semibold text-sm ${titleCls}`}>Upload &amp; compare documents</p>
               <p className={`text-xs mt-2 leading-relaxed ${subCls}`}>
-                {!isConfigured
-                  ? <>Select document count &amp; combination<br />from the dropdowns on the left</>
-                  : <>Add files on both sides<br />Wait for OCR to complete<br />Then click <strong>Compare Now</strong></>
+                {completedPanels.length === 0
+                  ? <>Drop files into any panel to begin<br />OCR runs automatically after upload</>
+                  : completedPanels.length === 1
+                    ? <>1 document ready — click <strong>View OCR Result</strong><br />or add more docs to compare</>
+                    : <>Add files on both sides<br />Wait for OCR to complete<br />Then click <strong>Compare Now</strong></>
                 }
               </p>
             </div>
@@ -1945,6 +1839,7 @@ export default function MatchingPage() {
             {comparing
               ? (aiComparing ? 'Waiting for AI Processing…' : 'Preparing…')
               : matchError ? 'Retry Compare'
+              : completedPanels.length === 1 ? 'View OCR Result'
               : 'Compare Now'}
           </button>
         </div>
