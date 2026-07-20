@@ -61,8 +61,8 @@ export default function AppLayout() {
                 `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 group ${
                   isActive
                     ? isLight
-                      ? 'bg-brand-50 text-brand-700 border border-brand-200'
-                      : 'bg-brand-600/20 text-brand-300 border border-brand-500/20'
+                      ? 'bg-sky-50 text-sky-700 border border-sky-200'
+                      : 'bg-sky-500/18 text-sky-300 border border-sky-500/30'
                     : isLight
                       ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                       : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
@@ -77,7 +77,7 @@ export default function AppLayout() {
                       : isLight ? 'text-slate-400 group-hover:text-slate-600' : 'text-slate-500 group-hover:text-slate-300'
                   } />
                   <span className="flex-1">{label}</span>
-                  {isActive && <ChevronRight size={14} className={isLight ? 'text-brand-400' : 'text-brand-400/60'} />}
+                  {isActive && <ChevronRight size={14} className={isLight ? 'text-sky-400' : 'text-sky-400/70'} />}
                 </>
               )}
             </NavLink>
@@ -86,7 +86,9 @@ export default function AppLayout() {
 
         {/* Footer */}
         <div className={`p-3 border-t space-y-1 ${isLight ? 'border-slate-200' : 'border-slate-800/60'}`}>
-          <button className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-150 w-full group
+          <button
+            onClick={() => navigate('/app/settings')}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-150 w-full group
             ${isLight ? 'text-slate-500 hover:text-slate-800 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'}`}>
             <Settings size={16} className={isLight ? 'text-slate-400' : 'text-slate-500 group-hover:text-slate-300'} />
             Settings

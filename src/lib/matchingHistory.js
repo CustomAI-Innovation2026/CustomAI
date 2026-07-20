@@ -99,6 +99,28 @@ export async function getMatchingHistory() {
   return lsGet()
 }
 
+// Admin: fetch all users' matching history (optionally filter by email)
+export async function getMatchingHistoryAdmin(filterEmail = null) {
+  let query = supabase
+    .from('matching_history')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(500)
+  if (filterEmail) query = query.eq('user_email', filterEmail)
+  const { data, error } = await query
+  if (error || !data) return []
+  return data.map(row => ({
+    id:           row.id,
+    userEmail:    row.user_email,
+    timestamp:    row.created_at,
+    comboLabel:   row.combo_label,
+    comboTypes:   row.combo_types,
+    fileNames:    row.file_names,
+    overallScore: row.overall_score,
+    pairs:        row.pairs,
+  }))
+}
+
 export async function deleteMatchingHistoryEntry(id) {
   await sbDelete(id)
   lsSet(lsGet().filter(e => e.id !== id))

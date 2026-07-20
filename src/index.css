@@ -280,5 +280,23 @@
 }
 .dropzone-active { @apply border-brand-400 bg-brand-900/20; }
 
+/* History item row yellow tint in light mode */
+[data-theme="light"] .history-row {
+  background-color: rgba(254, 243, 199, 0.70) !important;
+  border-color: rgba(251, 191, 36, 0.35) !important;
+}
+[data-theme="light"] .history-row:hover {
+  background-color: rgba(253, 230, 138, 0.85) !important;
+  border-color: rgba(251, 191, 36, 0.55) !important;
+}
+/* Dark mode: subtle warm tint */
+[data-theme="dark"] .history-row {
+  background-color: rgba(120, 80, 10, 0.12) !important;
+  border-color: rgba(180, 130, 30, 0.18) !important;
+}
+[data-theme="dark"] .history-row:hover {
+  background-color: rgba(140, 100, 15, 0.20) !important;
+}
+
 @keyframes ping-slow { 75%,100% { transform:scale(1.8); opacity:0; } }
 .animate-ping-slow { animation: ping-slow 2s cubic-bezier(0,0,.2,1) infinite; }

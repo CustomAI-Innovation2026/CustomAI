@@ -19,12 +19,34 @@ export async function loginUser(email, password) {
   const hash = await hashPassword(password)
   const { data, error } = await supabase
     .from('app_users')
-    .select('id, name, surname, email, business_unit')
+    .select('id, name, surname, email, business_unit, is_admin')
     .eq('email', email.toLowerCase().trim())
     .eq('password_hash', hash)
     .single()
   if (error || !data) throw new Error('Invalid email or password')
   return data
+}
+
+export async function getAppUsers() {
+  const { data, error } = await supabase
+    .from('app_users')
+    .select('id, name, surname, email, business_unit, is_admin, created_at')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function updateUserProfile(currentEmail, { name, surname, businessUnit, newEmail }) {
+  const updates = {}
+  if (name !== undefined) updates.name = name.trim()
+  if (surname !== undefined) updates.surname = surname.trim()
+  if (businessUnit !== undefined) updates.business_unit = businessUnit.trim()
+  if (newEmail !== undefined) updates.email = newEmail.toLowerCase().trim()
+  const { error } = await supabase
+    .from('app_users')
+    .update(updates)
+    .eq('email', currentEmail.toLowerCase().trim())
+  if (error) throw new Error('Failed to update profile')
 }
 
 export async function registerUser({ name, surname, email, businessUnit, password }) {

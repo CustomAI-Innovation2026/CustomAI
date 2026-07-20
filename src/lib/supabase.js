@@ -91,6 +91,19 @@ export async function getDocuments(limit = 20) {
   return data
 }
 
+// Admin: get documents for all users or filtered by email
+export async function getDocumentsAdmin(filterEmail = null, limit = 500) {
+  let query = supabase
+    .from('documents')
+    .select('*, workflow_runs(id, status, created_at), ocr_results(id)')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (filterEmail) query = query.eq('user_email', filterEmail)
+  const { data, error } = await query
+  if (error) throw error
+  return data ?? []
+}
+
 // Get OCR result
 export async function getOcrResult(documentId) {
   const { data, error } = await supabase

@@ -6,6 +6,7 @@ import ResultsPage from './pages/ResultsPage.jsx'
 import HistoryPage from './pages/HistoryPage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import MatchingPage from './pages/MatchingPage.jsx'
+import SettingsPage from './pages/SettingsPage.jsx'
 import { getCurrentUser } from './lib/auth.js'
 
 function ProtectedRoute({ children }) {
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="matching" element={<MatchingPage />} />
         <Route path="results/:documentId" element={<ResultsPage />} />
         <Route path="history"  element={<HistoryPage />} />
+        <Route path="settings" element={<SettingsPage />} />
       </Route>
     </Routes>
   )

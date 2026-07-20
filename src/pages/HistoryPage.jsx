@@ -114,7 +114,7 @@ function OcrHistoryTab({ search }) {
           <div
             key={doc.id}
             onClick={() => hasResults && navigate(`/app/results/${doc.id}`)}
-            className={`flex items-center gap-4 p-4 rounded-2xl border bg-slate-900/60 transition-all duration-200 ${
+            className={`history-row flex items-center gap-4 p-4 rounded-2xl border bg-slate-900/60 transition-all duration-200 ${
               hasResults
                 ? 'cursor-pointer hover:bg-slate-800/60 hover:border-slate-700 border-slate-800'
                 : 'border-slate-800/60 opacity-70'
@@ -225,7 +225,7 @@ function MatchingHistoryTab({ search }) {
             <div
               key={entry.id}
               onClick={() => viewEntry(entry)}
-              className="flex items-center gap-4 p-4 rounded-2xl border cursor-pointer
+              className="history-row flex items-center gap-4 p-4 rounded-2xl border cursor-pointer
                 bg-white/8 border-slate-700/60
                 hover:bg-white/12 hover:border-slate-600/80
                 transition-all duration-200 group"
