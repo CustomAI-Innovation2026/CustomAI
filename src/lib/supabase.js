@@ -132,8 +132,10 @@ export async function getN8nExecutions({ workflowId, startDate, endDate } = {}) 
   if (startDate) q = q.gte('started_at', startDate + 'T00:00:00')
   if (endDate)   q = q.lte('started_at', endDate   + 'T23:59:59')
   const { data, error } = await q
-  // Table might not exist yet — return empty instead of crashing
-  if (error) return []
+  if (error) {
+    console.warn('[n8n_executions] query error:', error.message, error.code)
+    return []
+  }
   return data ?? []
 }
 
