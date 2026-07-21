@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Upload, FileText, CheckCircle2, XCircle, GitCompare,
@@ -44,11 +44,31 @@ function KpiCard({ icon: Icon, label, value, sub, accent }) {
 
 // ── Heatmap ────────────────────────────────────────────────────
 function HeatmapChart({ docs, matchHistory }) {
+  const containerRef = useRef(null)
+  const [cellSize, setCellSize] = useState(14)
+
   const now = new Date()
   const year = now.getFullYear()
   const currentMonth = now.getMonth()
   const months = Array.from({ length: currentMonth + 1 }, (_, i) => i)
   const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  const GAP = 2, LABEL_W = 34, DAYS = 31
+
+  // Auto-size cells to fill container exactly
+  useEffect(() => {
+    if (!containerRef.current) return
+    const calc = () => {
+      const w = containerRef.current.clientWidth
+      const available = w - LABEL_W - DAYS * GAP
+      setCellSize(Math.max(9, Math.floor(available / DAYS)))
+    }
+    calc()
+    const ro = new ResizeObserver(calc)
+    ro.observe(containerRef.current)
+    return () => ro.disconnect()
+  }, [])
+
+  const CELL = cellSize
 
   const counts = useMemo(() => {
     const c = {}
@@ -79,60 +99,57 @@ function HeatmapChart({ docs, matchHistory }) {
     return 'rgba(46,125,212,0.95)'
   }
 
-  const CELL = 24, GAP = 3, LABEL_W = 34, DAYS = 31
-
   return (
-    <div className="overflow-x-auto">
-      <div style={{ minWidth: LABEL_W + (CELL + GAP) * DAYS }}>
-        {/* Day labels */}
-        <div className="flex" style={{ marginLeft: LABEL_W }}>
-          {[1,5,10,15,20,25,30].map((d, i) => {
-            const prevD = [0,1,5,10,15,20,25][i]
-            const w = (d - prevD) * (CELL + GAP)
-            return (
-              <div key={d} style={{ width: w, fontSize: 9, color: '#64748b' }}>{d}</div>
-            )
-          })}
-        </div>
-        {/* Month rows */}
-        {months.map(m => {
-          const days = daysInMonth(year, m)
-          return (
-            <div key={m} className="flex items-center" style={{ marginBottom: GAP }}>
-              <div style={{ width: LABEL_W, fontSize: 10, color: '#94a3b8', textAlign: 'right', paddingRight: 8, flexShrink: 0 }}>
-                {MONTH_NAMES[m]}
-              </div>
-              {Array.from({ length: DAYS }, (_, i) => {
-                const day = i + 1, valid = day <= days
-                const cnt = valid ? (counts[`${m}-${day}`] || 0) : 0
-                return (
-                  <div key={i} title={valid ? `${MONTH_NAMES[m]} ${day}: ${cnt}` : ''}
-                    style={{
-                      width: CELL, height: CELL, marginRight: GAP, flexShrink: 0,
-                      background: valid ? cellColor(cnt) : 'transparent',
-                      borderRadius: 4,
-                      border: valid ? '1px solid rgba(46,125,212,0.14)' : 'none',
-                    }}
-                  />
-                )
-              })}
-            </div>
-          )
+    <div ref={containerRef} className="overflow-hidden">
+      {/* Day labels */}
+      <div className="flex" style={{ marginLeft: LABEL_W, marginBottom: 2 }}>
+        {[1,5,10,15,20,25,30].map((d, i) => {
+          const prevD = [0,1,5,10,15,20,25][i]
+          const w = (d - prevD) * (CELL + GAP)
+          return <div key={d} style={{ width: w, fontSize: 9, color: '#64748b' }}>{d}</div>
         })}
-        {/* Legend */}
-        <div className="flex items-center gap-2 mt-3" style={{ marginLeft: LABEL_W }}>
-          <span style={{ fontSize: 10, color: '#64748b' }}>Less</span>
-          {[0.07,0.20,0.40,0.58,0.76,0.95].map((op, i) => (
-            <div key={i} style={{ width: CELL, height: CELL, background: `rgba(46,125,212,${op})`, borderRadius: 4 }} />
-          ))}
-          <span style={{ fontSize: 10, color: '#64748b' }}>More</span>
-        </div>
+      </div>
+      {/* Month rows */}
+      {months.map(m => {
+        const days = daysInMonth(year, m)
+        return (
+          <div key={m} className="flex items-center" style={{ marginBottom: GAP }}>
+            <div style={{ width: LABEL_W, fontSize: 10, color: '#94a3b8', textAlign: 'right', paddingRight: 8, flexShrink: 0 }}>
+              {MONTH_NAMES[m]}
+            </div>
+            {Array.from({ length: DAYS }, (_, i) => {
+              const day = i + 1, valid = day <= days
+              const cnt = valid ? (counts[`${m}-${day}`] || 0) : 0
+              return (
+                <div key={i} title={valid ? `${MONTH_NAMES[m]} ${day}: ${cnt}` : ''}
+                  style={{
+                    width: CELL, height: CELL, marginRight: GAP, flexShrink: 0,
+                    background: valid ? cellColor(cnt) : 'transparent',
+                    borderRadius: 3,
+                    border: valid ? '1px solid rgba(46,125,212,0.14)' : 'none',
+                  }}
+                />
+              )
+            })}
+          </div>
+        )
+      })}
+      {/* Legend */}
+      <div className="flex items-center gap-2 mt-3" style={{ marginLeft: LABEL_W }}>
+        <span style={{ fontSize: 10, color: '#64748b' }}>Less</span>
+        {[0.07,0.20,0.40,0.58,0.76,0.95].map((op, i) => (
+          <div key={i} style={{ width: CELL, height: CELL, background: `rgba(46,125,212,${op})`, borderRadius: 3 }} />
+        ))}
+        <span style={{ fontSize: 10, color: '#64748b' }}>More</span>
       </div>
     </div>
   )
 }
 
 // ── Donut Chart ────────────────────────────────────────────────
+const MATCH_GREEN   = '#22c55e'
+const MISMATCH_RED  = '#ef4444'
+
 function DonutChart({ matchCount, mismatchCount }) {
   const total = matchCount + mismatchCount
   if (total === 0) {
@@ -154,14 +171,37 @@ function DonutChart({ matchCount, mismatchCount }) {
   const xA = arc(mismatchPct, matchPct)
 
   return (
-    <div className="flex items-center gap-4">
-      {/* Donut */}
+    <div className="flex items-center gap-3">
+      {/* Legend — left side */}
+      <div className="space-y-3 min-w-0">
+        <div>
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: MATCH_GREEN }} />
+            <p className="text-[11px] text-slate-400 font-medium">Match</p>
+          </div>
+          <p className="text-lg font-black leading-tight pl-4" style={{ color: MATCH_GREEN }}>
+            {matchCount}
+            <span className="text-[11px] font-normal text-slate-500 ml-1">({matchPct}%)</span>
+          </p>
+        </div>
+        <div>
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: MISMATCH_RED }} />
+            <p className="text-[11px] text-slate-400 font-medium">Mismatch</p>
+          </div>
+          <p className="text-lg font-black leading-tight pl-4" style={{ color: MISMATCH_RED }}>
+            {mismatchCount}
+            <span className="text-[11px] font-normal text-slate-500 ml-1">({mismatchPct}%)</span>
+          </p>
+        </div>
+      </div>
+      {/* Donut — right side */}
       <svg width={128} height={128} viewBox="0 0 128 128" style={{ flexShrink: 0 }}>
         <circle cx={CX} cy={CY} r={R} fill="none" stroke="rgba(100,130,180,0.10)" strokeWidth={SW} />
-        <circle cx={CX} cy={CY} r={R} fill="none" stroke={SCGJWD_BLUE} strokeWidth={SW}
+        <circle cx={CX} cy={CY} r={R} fill="none" stroke={MATCH_GREEN} strokeWidth={SW}
           strokeDasharray={mA.strokeDasharray} strokeDashoffset={mA.strokeDashoffset}
           strokeLinecap="butt" transform={`rotate(-90 ${CX} ${CY})`} />
-        <circle cx={CX} cy={CY} r={R} fill="none" stroke={SCGJWD_ORANGE} strokeWidth={SW}
+        <circle cx={CX} cy={CY} r={R} fill="none" stroke={MISMATCH_RED} strokeWidth={SW}
           strokeDasharray={xA.strokeDasharray} strokeDashoffset={xA.strokeDashoffset}
           strokeLinecap="butt" transform={`rotate(-90 ${CX} ${CY})`} />
         <circle cx={CX} cy={CY} r={R - SW / 2 - 2} fill="white" opacity="0.92" />
@@ -169,27 +209,6 @@ function DonutChart({ matchCount, mismatchCount }) {
         <text x={CX} y={CY + 9}  textAnchor="middle" fontSize={9} style={{ fill: '#475569' }}>Total</text>
         <text x={CX} y={CY + 19} textAnchor="middle" fontSize={9} style={{ fill: '#475569' }}>Compare</text>
       </svg>
-      {/* Legend — pushed right */}
-      <div className="space-y-2 flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: SCGJWD_BLUE }} />
-          <div className="min-w-0">
-            <p className="text-[11px] text-slate-400 font-medium leading-tight">Match</p>
-            <p className="text-base font-black leading-tight" style={{ color: SCGJWD_BLUE }}>
-              {matchCount} <span className="text-[11px] font-normal text-slate-500">({matchPct}%)</span>
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: SCGJWD_ORANGE }} />
-          <div className="min-w-0">
-            <p className="text-[11px] text-slate-400 font-medium leading-tight">Mismatch</p>
-            <p className="text-base font-black leading-tight" style={{ color: SCGJWD_ORANGE }}>
-              {mismatchCount} <span className="text-[11px] font-normal text-slate-500">({mismatchPct}%)</span>
-            </p>
-          </div>
-        </div>
-      </div>
     </div>
   )
 }
@@ -338,30 +357,75 @@ function PipelineStatsModal({ onClose }) {
         </div>
 
         {/* KPI cards */}
-        <div className="grid grid-cols-3 gap-4 mb-5">
-          {[
-            { label: '# Succeed', value: hasData ? succeed : '—', color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
-            { label: '# Error',   value: hasData ? errored : '—', color: 'text-red-400',   bg: 'bg-red-500/10',   border: 'border-red-500/20' },
-            { label: '# Running', value: hasData ? running : '—', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
-          ].map(({ label, value, color, bg, border }) => (
-            <div key={label} className={`rounded-xl p-4 ${bg} border ${border} text-center`}>
-              <p className={`text-3xl font-black ${color}`}>{loadingExecs ? '…' : value}</p>
-              <p className="text-slate-400 text-xs mt-1">{label}</p>
+        <div className="grid grid-cols-4 gap-3 mb-5">
+          {loadingExecs ? (
+            <div className="col-span-4 text-center text-slate-500 py-2 text-sm">Loading…</div>
+          ) : [
+            { label: '#Calls Total',   value: hasData ? execs.length : '—', pct: null,                                               color: 'text-slate-300',  bg: 'bg-slate-700/40',   border: 'border-slate-600/30' },
+            { label: '#Succeed',       value: hasData ? succeed : '—',       pct: hasData ? (succeed/execs.length*100).toFixed(1)+'%' : null, color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
+            { label: '#Error',         value: hasData ? errored : '—',       pct: hasData ? (errored/execs.length*100).toFixed(1)+'%' : null, color: 'text-red-400',   bg: 'bg-red-500/10',   border: 'border-red-500/20' },
+            { label: '#Running',       value: hasData ? running : '—',       pct: null,                                               color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
+          ].map(({ label, value, pct, color, bg, border }) => (
+            <div key={label} className={`rounded-xl p-3 ${bg} border ${border} text-center`}>
+              <p className={`text-2xl font-black ${color}`}>{value}</p>
+              {pct && <p className="text-xs font-semibold text-slate-400 mt-0.5">{pct}</p>}
+              <p className="text-slate-500 text-[10px] mt-1">{label}</p>
             </div>
           ))}
         </div>
 
+        {/* Execution timeline mini-chart */}
+        {hasData && (() => {
+          // Group by date
+          const byDate = {}
+          execs.forEach(e => {
+            const d = e.started_at ? e.started_at.slice(0, 10) : 'unknown'
+            if (!byDate[d]) byDate[d] = { s: 0, e: 0 }
+            if (e.status === 'success') byDate[d].s++
+            else if (e.status === 'error') byDate[d].e++
+          })
+          const dates = Object.keys(byDate).sort().slice(-14) // last 14 days
+          const maxBar = Math.max(1, ...dates.map(d => byDate[d].s + byDate[d].e))
+          const BAR_H = 48
+          return (
+            <div className="mb-4">
+              <p className="text-[10px] text-slate-500 mb-2 uppercase tracking-wider">Daily Executions (last 14 days)</p>
+              <div className="flex items-end gap-1" style={{ height: BAR_H + 20 }}>
+                {dates.map(d => {
+                  const { s, e } = byDate[d]
+                  const sH = Math.round(s / maxBar * BAR_H)
+                  const eH = Math.round(e / maxBar * BAR_H)
+                  return (
+                    <div key={d} className="flex flex-col items-center gap-0 flex-1 min-w-0" title={`${d}: ${s} ok, ${e} err`}>
+                      <div style={{ display: 'flex', flexDirection: 'column-reverse', height: BAR_H, width: '100%', borderRadius: '3px 3px 0 0', overflow: 'hidden' }}>
+                        <div style={{ height: sH, background: '#22c55e', flexShrink: 0 }} />
+                        <div style={{ height: eH, background: '#ef4444', flexShrink: 0 }} />
+                      </div>
+                      <span style={{ fontSize: 8, color: '#475569', marginTop: 2 }}>{d.slice(5)}</span>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="flex gap-3 mt-1">
+                <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block w-2 h-2 rounded-sm bg-green-500" /> Success</span>
+                <span className="flex items-center gap-1 text-[10px] text-slate-400"><span className="inline-block w-2 h-2 rounded-sm bg-red-500" /> Error</span>
+              </div>
+            </div>
+          )
+        })()}
+
         {/* Execution list */}
         {hasData ? (
-          <div className="space-y-1.5 max-h-48 overflow-y-auto">
+          <div className="space-y-1 max-h-44 overflow-y-auto">
             {execs.slice(0, 20).map(ex => (
-              <div key={ex.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-slate-800/50 text-sm">
+              <div key={ex.id} className="flex items-center gap-3 px-3 py-1.5 rounded-lg bg-slate-800/50 text-sm">
                 <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
                   ex.status === 'success' ? 'bg-green-400' :
                   ex.status === 'error'   ? 'bg-red-400' : 'bg-amber-400'}`} />
-                <span className="text-slate-300 flex-1 truncate">
+                <span className="text-slate-500 text-xs w-32 flex-shrink-0">
                   {ex.started_at ? new Date(ex.started_at).toLocaleString() : '—'}
                 </span>
+                <span className="text-slate-400 text-xs flex-1 truncate">{ex.user_email || '—'}</span>
                 <span className={`text-xs font-medium capitalize ${
                   ex.status === 'success' ? 'text-green-400' :
                   ex.status === 'error'   ? 'text-red-400' : 'text-amber-400'}`}>
@@ -374,11 +438,23 @@ function PipelineStatsModal({ onClose }) {
             ))}
           </div>
         ) : (
-          <div className="rounded-xl border border-dashed border-slate-700 p-5 text-center">
-            <p className="text-slate-400 text-sm mb-1">No execution logs found</p>
-            <p className="text-slate-500 text-xs">
-              Configure n8n to save executions to Supabase <code className="text-green-400">n8n_executions</code> table via HTTP node at workflow end.
-            </p>
+          <div className="rounded-xl border border-dashed border-slate-700 p-5">
+            <p className="text-slate-300 text-sm font-medium mb-2">Setup: Connect n8n → Supabase</p>
+            <p className="text-slate-500 text-xs mb-3">n8n execution logs disappear after 24h. Save them permanently by adding a Supabase HTTP node at the end of each workflow.</p>
+            <div className="rounded-lg bg-slate-800/60 p-3 text-xs font-mono text-green-300 overflow-x-auto">
+              <p className="text-slate-400 mb-1">-- Run in Supabase SQL Editor:</p>
+              <p>CREATE TABLE n8n_executions (</p>
+              <p className="pl-4">id TEXT PRIMARY KEY,</p>
+              <p className="pl-4">workflow_id TEXT NOT NULL,</p>
+              <p className="pl-4">workflow_name TEXT,</p>
+              <p className="pl-4">status TEXT, -- 'success' | 'error' | 'running'</p>
+              <p className="pl-4">started_at TIMESTAMPTZ,</p>
+              <p className="pl-4">finished_at TIMESTAMPTZ,</p>
+              <p className="pl-4">duration_ms INTEGER,</p>
+              <p className="pl-4">user_email TEXT REFERENCES app_users(email),</p>
+              <p className="pl-4">created_at TIMESTAMPTZ DEFAULT NOW()</p>
+              <p>);</p>
+            </div>
           </div>
         )}
 
@@ -461,6 +537,11 @@ export default function DashboardPage() {
   )
 
   const totalFiles    = filteredDocs.length
+  const totalPages    = filteredDocs.reduce((sum, doc) => {
+    const ocr = doc.ocr_results?.[0]
+    if (!ocr) return sum
+    return sum + (ocr.metadata?.total_pages || ocr.metadata?.pages?.length || 1)
+  }, 0)
   const totalMatching = filteredHistory.length
   const matchCount    = filteredHistory.filter(e => e.overallScore === 100).length
   const mismatchCount = totalMatching - matchCount
@@ -521,7 +602,7 @@ export default function DashboardPage() {
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           <KpiCard icon={FileText}     accent="blue"   value={totalFiles}    label="Total Document Files"           sub={periodLabel} />
-          <KpiCard icon={FileText}     accent="purple" value="—"             label="Total Document Pages"           sub="Not tracked yet" />
+          <KpiCard icon={FileText}     accent="purple" value={totalPages || '—'} label="Total Document Pages"        sub={totalPages ? periodLabel : 'From OCR results'} />
           <KpiCard icon={GitCompare}   accent="amber"  value={totalMatching} label="Total Matching Compare (#Testing)" sub={periodLabel} />
           <KpiCard icon={CheckCircle2} accent="green"  value={matchCount}    label={`Match all fields · ${matchRate}%`} sub={periodLabel} />
           <KpiCard icon={XCircle}      accent="red"    value={mismatchCount} label={`Mismatch some fields · ${mismatchRate}%`} sub={periodLabel} />

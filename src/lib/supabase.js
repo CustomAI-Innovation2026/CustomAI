@@ -80,7 +80,7 @@ export async function getDocuments(limit = 20) {
   const userEmail = getCurrentUser()?.email ?? null
   let query = supabase
     .from('documents')
-    .select('*, workflow_runs(id, status, created_at), ocr_results(id)')
+    .select('*, workflow_runs(id, status, created_at), ocr_results(id, metadata)')
     .order('created_at', { ascending: false })
     .limit(limit)
 
@@ -95,7 +95,7 @@ export async function getDocuments(limit = 20) {
 export async function getDocumentsAdmin(filterEmail = null, limit = 500) {
   let query = supabase
     .from('documents')
-    .select('*, workflow_runs(id, status, created_at), ocr_results(id)')
+    .select('*, workflow_runs(id, status, created_at), ocr_results(id, metadata)')
     .order('created_at', { ascending: false })
     .limit(limit)
   if (filterEmail) query = query.eq('user_email', filterEmail)
