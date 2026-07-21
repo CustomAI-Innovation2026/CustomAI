@@ -171,32 +171,9 @@ function DonutChart({ matchCount, mismatchCount }) {
   const xA = arc(mismatchPct, matchPct)
 
   return (
-    <div className="flex items-center gap-3">
-      {/* Legend — left side */}
-      <div className="space-y-3 min-w-0">
-        <div>
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: MATCH_GREEN }} />
-            <p className="text-[11px] text-slate-400 font-medium">Match</p>
-          </div>
-          <p className="text-lg font-black leading-tight pl-4" style={{ color: MATCH_GREEN }}>
-            {matchCount}
-            <span className="text-[11px] font-normal text-slate-500 ml-1">({matchPct}%)</span>
-          </p>
-        </div>
-        <div>
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: MISMATCH_RED }} />
-            <p className="text-[11px] text-slate-400 font-medium">Mismatch</p>
-          </div>
-          <p className="text-lg font-black leading-tight pl-4" style={{ color: MISMATCH_RED }}>
-            {mismatchCount}
-            <span className="text-[11px] font-normal text-slate-500 ml-1">({mismatchPct}%)</span>
-          </p>
-        </div>
-      </div>
-      {/* Donut — right side */}
-      <svg width={128} height={128} viewBox="0 0 128 128" style={{ flexShrink: 0 }}>
+    <div className="flex items-center gap-4 w-full">
+      {/* Donut — left side */}
+      <svg width={120} height={120} viewBox="0 0 128 128" style={{ flexShrink: 0 }}>
         <circle cx={CX} cy={CY} r={R} fill="none" stroke="rgba(100,130,180,0.10)" strokeWidth={SW} />
         <circle cx={CX} cy={CY} r={R} fill="none" stroke={MATCH_GREEN} strokeWidth={SW}
           strokeDasharray={mA.strokeDasharray} strokeDashoffset={mA.strokeDashoffset}
@@ -209,6 +186,35 @@ function DonutChart({ matchCount, mismatchCount }) {
         <text x={CX} y={CY + 9}  textAnchor="middle" fontSize={9} style={{ fill: '#475569' }}>Total</text>
         <text x={CX} y={CY + 19} textAnchor="middle" fontSize={9} style={{ fill: '#475569' }}>Compare</text>
       </svg>
+      {/* Legend — right side, fills remaining width */}
+      <div className="flex-1 space-y-4 min-w-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: MATCH_GREEN }} />
+            <p className="text-xs text-slate-400 font-medium">Match</p>
+          </div>
+          <div className="text-right">
+            <span className="text-base font-black leading-tight" style={{ color: MATCH_GREEN }}>{matchCount}</span>
+            <span className="text-[11px] font-normal text-slate-500 ml-1">({matchPct}%)</span>
+          </div>
+        </div>
+        <div className="w-full rounded-full overflow-hidden" style={{ height: 5, background: 'rgba(34,197,94,0.15)' }}>
+          <div style={{ width: `${matchPct}%`, height: '100%', background: MATCH_GREEN, borderRadius: 9999 }} />
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: MISMATCH_RED }} />
+            <p className="text-xs text-slate-400 font-medium">Mismatch</p>
+          </div>
+          <div className="text-right">
+            <span className="text-base font-black leading-tight" style={{ color: MISMATCH_RED }}>{mismatchCount}</span>
+            <span className="text-[11px] font-normal text-slate-500 ml-1">({mismatchPct}%)</span>
+          </div>
+        </div>
+        <div className="w-full rounded-full overflow-hidden" style={{ height: 5, background: 'rgba(239,68,68,0.15)' }}>
+          <div style={{ width: `${mismatchPct}%`, height: '100%', background: MISMATCH_RED, borderRadius: 9999 }} />
+        </div>
+      </div>
     </div>
   )
 }
@@ -437,24 +443,11 @@ function PipelineStatsModal({ onClose }) {
               </div>
             ))}
           </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-slate-700 p-5">
-            <p className="text-slate-300 text-sm font-medium mb-2">Setup: Connect n8n → Supabase</p>
-            <p className="text-slate-500 text-xs mb-3">n8n execution logs disappear after 24h. Save them permanently by adding a Supabase HTTP node at the end of each workflow.</p>
-            <div className="rounded-lg bg-slate-800/60 p-3 text-xs font-mono text-green-300 overflow-x-auto">
-              <p className="text-slate-400 mb-1">-- Run in Supabase SQL Editor:</p>
-              <p>CREATE TABLE n8n_executions (</p>
-              <p className="pl-4">id TEXT PRIMARY KEY,</p>
-              <p className="pl-4">workflow_id TEXT NOT NULL,</p>
-              <p className="pl-4">workflow_name TEXT,</p>
-              <p className="pl-4">status TEXT, -- 'success' | 'error' | 'running'</p>
-              <p className="pl-4">started_at TIMESTAMPTZ,</p>
-              <p className="pl-4">finished_at TIMESTAMPTZ,</p>
-              <p className="pl-4">duration_ms INTEGER,</p>
-              <p className="pl-4">user_email TEXT REFERENCES app_users(email),</p>
-              <p className="pl-4">created_at TIMESTAMPTZ DEFAULT NOW()</p>
-              <p>);</p>
-            </div>
+        ) : !loadingExecs && (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <Activity size={32} className="text-slate-700 mb-3" />
+            <p className="text-slate-400 text-sm font-medium mb-1">No execution logs yet</p>
+            <p className="text-slate-600 text-xs">Re-import the updated workflow JSON into n8n to start logging</p>
           </div>
         )}
 
@@ -609,27 +602,27 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── Middle row: Heatmap (2/3) + Charts stacked (1/3) ── */}
+      {/* ── Heatmap — full width ── */}
+      {!loading && (
+        <div className="card">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-white text-sm">Document Matching Usage Overview</h2>
+            <span className="text-slate-500 text-xs">{new Date().getFullYear()} YTD</span>
+          </div>
+          <HeatmapChart docs={docs} matchHistory={matchHistory} />
+        </div>
+      )}
+
+      {/* ── Donut (1/3) + Bar chart (2/3) side-by-side ── */}
       {!loading && (
         <div className="grid lg:grid-cols-3 gap-4">
-          {/* Heatmap — col-span-2 */}
-          <div className="card lg:col-span-2">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-white text-sm">Document Matching Usage Overview</h2>
-              <span className="text-slate-500 text-xs">{new Date().getFullYear()} YTD</span>
-            </div>
-            <HeatmapChart docs={docs} matchHistory={matchHistory} />
+          <div className="card">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Documents Summary</p>
+            <DonutChart matchCount={matchCount} mismatchCount={mismatchCount} />
           </div>
-          {/* Right column — donut + bar stacked */}
-          <div className="flex flex-col gap-4">
-            <div className="card flex-1">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Documents Summary</p>
-              <DonutChart matchCount={matchCount} mismatchCount={mismatchCount} />
-            </div>
-            <div className="card flex-1">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Analysis by Doc Type</p>
-              <DocTypeBarChart matchHistory={filteredHistory} />
-            </div>
+          <div className="card lg:col-span-2">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Analysis by Doc Type</p>
+            <DocTypeBarChart matchHistory={filteredHistory} />
           </div>
         </div>
       )}
