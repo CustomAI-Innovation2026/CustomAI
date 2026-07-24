@@ -455,6 +455,170 @@ function CompareTable({ fields, colDefs, isLight }) {
     empty:       { text: '—',          cls: 'bg-slate-500/10 text-slate-400 border border-slate-500/20' },
   }
 
+  // ── Helpers ──────────────────────────────────────────────────
+  function getColVal(f, col) {
+    if (f && f.values) return f.values[col.key] ?? null
+    if (!f) return null
+    if (col.key === 'left')  return f.leftVal  ?? null
+    if (col.key === 'right') return f.rightVal ?? null
+    return null
+  }
+
+  function renderFieldRow(f, key, indentPx = 12) {
+    if (!f) return null
+    const isMismatch = f.status === 'mismatch'
+    const isMatch    = f.status === 'match' || f.status === 'fuzzy_match'
+    const rowBg      = isMismatch ? (isLight ? 'bg-red-500/[0.06]' : 'bg-red-500/[0.08]')
+                     : isMatch    ? (isLight ? 'bg-green-500/[0.06]' : 'bg-green-500/[0.08]') : ''
+    const outlierKeys = (isMismatch && isMulti) ? getMismatchCellKeys(f, colDefs) : new Set()
+    const sCfg = STATUS_CFG[f.status] ?? STATUS_CFG.empty
+    return (
+      <tr key={key} className={`border-b ${rowBg} ${isLight ? 'border-slate-100 hover:bg-slate-50/80' : 'border-slate-800/60 hover:bg-slate-800/20'}`}>
+        <td className={`py-2 text-[11px] font-semibold border-r align-top ${subCls}`} style={{ borderColor: bc, paddingLeft: indentPx }}>
+          {f.field ?? f.label}
+        </td>
+        {colDefs.map(col => {
+          const val = getColVal(f, col)
+          const isOutlier = outlierKeys.has(col.key)
+          return (
+            <td key={col.key} className="px-2 py-2 text-[11px] border-r align-top" style={{ borderColor: bc }}>
+              {isOutlier ? (
+                <div style={{ border: '1.5px dashed #ef4444', borderRadius: 6, background: isLight ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.12)', padding: '3px 6px', display: 'inline-block', minWidth: '80%' }}>
+                  <span className={val ? (isLight ? 'text-red-700 font-medium' : 'text-red-300 font-medium') : nilCls}>{val || '—'}</span>
+                </div>
+              ) : (
+                <span className={val ? valCls : nilCls}>{val || '—'}</span>
+              )}
+            </td>
+          )
+        })}
+        <td className="px-2 py-2 text-center align-top">
+          <span className={`inline-block px-1.5 py-0.5 rounded-full text-[9px] font-bold ${sCfg.cls}`}>{sCfg.text}</span>
+        </td>
+      </tr>
+    )
+  }
+
+  function renderSubHeader(text, key) {
+    return (
+      <tr key={key}>
+        <td colSpan={colDefs.length + 2} style={{ background: isLight ? '#fde8d8' : '#3d1a0a', borderBottom: `1px solid ${bc}`, padding: '5px 16px' }}>
+          <span style={{ fontWeight: 700, fontSize: 11, color: isLight ? '#9a3412' : '#fb923c' }}>{text}</span>
+        </td>
+      </tr>
+    )
+  }
+
+  function renderGroupHeaderRow(prefix, labelText, groupIdx, headerField) {
+    const sCfg = STATUS_CFG[headerField?.status ?? 'none'] ?? STATUS_CFG.empty
+    return (
+      <tr key={`gh-${groupIdx}`} style={{ background: isLight ? '#e0f2fe' : '#082f49', borderBottom: `1px solid ${bc}` }}>
+        <td className="py-2 border-r" style={{ borderColor: bc, paddingLeft: 16 }}>
+          <span style={{ color: '#0284c7', fontWeight: 700, fontSize: 11 }}>{prefix} </span>
+          <span className={`text-[11px] font-semibold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{labelText}</span>
+          <span className={`text-[10px] ml-1.5 ${subCls}`}>(ที่ {groupIdx + 1})</span>
+        </td>
+        {colDefs.map(col => {
+          const val = headerField ? getColVal(headerField, col) : null
+          return (
+            <td key={col.key} className="px-2 py-2 text-[11px] border-r align-top" style={{ borderColor: bc }}>
+              <span className={val ? `${valCls} font-medium` : nilCls}>{val || '—'}</span>
+            </td>
+          )
+        })}
+        <td className="px-2 py-2 text-center align-top">
+          <span className={`inline-block px-1.5 py-0.5 rounded-full text-[9px] font-bold ${sCfg.cls}`}>{sCfg.text}</span>
+        </td>
+      </tr>
+    )
+  }
+
+  // Split "CGMU1234567 — Seal No." → { cn: 'CGMU1234567', sub: 'Seal No.' }
+  function splitContainerLabel(lbl) {
+    const m = lbl.match(/^(.+?)\s+[—–\-]{1,2}\s+(.+)$/)
+    if (m) return { cn: m[1].trim(), sub: m[2].trim() }
+    return null
+  }
+
+  function renderContainerFields(sFields) {
+    const overviewFields = []
+    const perContainerFields = []
+    sFields.forEach(f => {
+      const lbl = f.field ?? f.label ?? ''
+      if (splitContainerLabel(lbl)) perContainerFields.push(f)
+      else overviewFields.push(f)
+    })
+
+    const containerMap = {}
+    const containerOrder = []
+    perContainerFields.forEach(f => {
+      const lbl = f.field ?? f.label ?? ''
+      const parts = splitContainerLabel(lbl)
+      if (!parts) return
+      const { cn, sub } = parts
+      if (!containerMap[cn]) { containerMap[cn] = []; containerOrder.push(cn) }
+      containerMap[cn].push({ ...f, field: sub })
+    })
+
+    const rows = []
+    if (overviewFields.length > 0) {
+      rows.push(renderSubHeader('Total Container Overview', 'sub-ct-overview'))
+      overviewFields.forEach((f, fi) => rows.push(renderFieldRow(f, `ct-ov-${fi}`, 28)))
+    }
+    if (containerOrder.length > 0) {
+      rows.push(renderSubHeader('Single Container', 'sub-ct-single'))
+      containerOrder.forEach((cn, cnIdx) => {
+        const cnFields = containerMap[cn]
+        const headerField = cnFields.find(f => f.field === 'Container No.') ?? null
+        const subFields   = cnFields.filter(f => f.field !== 'Container No.')
+        rows.push(renderGroupHeaderRow(`4.${cnIdx + 1}`, 'Container Number', cnIdx, headerField))
+        subFields.forEach((sf, sfi) => rows.push(renderFieldRow(sf, `ct-${cnIdx}-${sfi}`, 44)))
+      })
+    }
+    if (overviewFields.length === 0 && containerOrder.length === 0) {
+      sFields.forEach((f, fi) => rows.push(renderFieldRow(f, `ct-flat-${fi}`, 12)))
+    }
+    return rows
+  }
+
+  function renderProductFields(sFields) {
+    const overviewFields = []
+    const itemMap = {}
+    const itemOrder = []
+
+    sFields.forEach(f => {
+      const lbl = f.field ?? f.label ?? ''
+      const m = lbl.match(/^(Item\s+\d+(?:\s*\([^)]+\))?)\s+(.+)$/)
+      if (m) {
+        const itemKey = m[1].trim()
+        const sub = m[2].trim()
+        if (!itemMap[itemKey]) { itemMap[itemKey] = []; itemOrder.push(itemKey) }
+        itemMap[itemKey].push({ ...f, field: sub })
+      } else {
+        overviewFields.push(f)
+      }
+    })
+
+    const rows = []
+    if (overviewFields.length > 0) {
+      rows.push(renderSubHeader('Total Product Overview', 'sub-pr-overview'))
+      overviewFields.forEach((f, fi) => rows.push(renderFieldRow(f, `pr-ov-${fi}`, 28)))
+    }
+    if (itemOrder.length > 0) {
+      itemOrder.forEach((itemKey, iIdx) => {
+        const itemFields = itemMap[itemKey]
+        const nameField  = itemFields.find(f => f.field === 'Name') ?? null
+        const subFields  = nameField ? itemFields.filter(f => f.field !== 'Name') : itemFields
+        rows.push(renderGroupHeaderRow(`5.${iIdx + 1}`, `Item Product Name #${iIdx + 1}`, iIdx, nameField))
+        subFields.forEach((sf, sfi) => rows.push(renderFieldRow(sf, `pr-${iIdx}-${sfi}`, 44)))
+      })
+    }
+    if (overviewFields.length === 0 && itemOrder.length === 0) {
+      sFields.forEach((f, fi) => rows.push(renderFieldRow(f, `pr-flat-${fi}`, 12)))
+    }
+    return rows
+  }
+
   return (
     <table className="w-full border-collapse" style={{ minWidth: `${180 + colDefs.length * 150}px` }}>
       <thead className={`sticky top-0 z-10 ${isLight ? 'bg-white' : 'bg-slate-900'}`}>
@@ -497,55 +661,9 @@ function CompareTable({ fields, colDefs, isLight }) {
                   </div>
                 </td>
               </tr>
-              {sFields.map((f, fi) => {
-                const isMismatch = f.status === 'mismatch'
-                const isMatch    = f.status === 'match' || f.status === 'fuzzy_match'
-                // Row background: 15% opacity shade
-                const rowBg = isMismatch
-                  ? (isLight ? 'bg-red-500/[0.06]'   : 'bg-red-500/[0.08]')
-                  : isMatch
-                  ? (isLight ? 'bg-green-500/[0.06]' : 'bg-green-500/[0.08]')
-                  : ''
-                // Outlier cells for 3+ doc types
-                const outlierKeys = (isMismatch && isMulti) ? getMismatchCellKeys(f, colDefs) : new Set()
-                const sCfg = STATUS_CFG[f.status] ?? STATUS_CFG.empty
-                return (
-                  <tr key={fi} className={`border-b ${rowBg} ${isLight ? 'border-slate-100 hover:bg-slate-50/80' : 'border-slate-800/60 hover:bg-slate-800/20'}`}>
-                    <td className={`px-3 py-2 text-[11px] font-semibold border-r align-top ${subCls}`} style={{ borderColor: bc }}>
-                      {f.field ?? f.label}
-                    </td>
-                    {colDefs.map(col => {
-                      const val = f.values ? f.values[col.key] : (col.key === 'left' ? f.leftVal : f.rightVal)
-                      const isOutlier = outlierKeys.has(col.key)
-                      return (
-                        <td key={col.key} className="px-2 py-2 text-[11px] border-r align-top" style={{ borderColor: bc }}>
-                          {isOutlier ? (
-                            <div style={{
-                              border: '1.5px dashed #ef4444',
-                              borderRadius: 6,
-                              background: isLight ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.12)',
-                              padding: '3px 6px',
-                              display: 'inline-block',
-                              minWidth: '80%',
-                            }}>
-                              <span className={val ? (isLight ? 'text-red-700 font-medium' : 'text-red-300 font-medium') : nilCls}>
-                                {val || '—'}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className={val ? valCls : nilCls}>{val || '—'}</span>
-                          )}
-                        </td>
-                      )
-                    })}
-                    <td className="px-2 py-2 text-center align-top">
-                      <span className={`inline-block px-1.5 py-0.5 rounded-full text-[9px] font-bold ${sCfg.cls}`}>
-                        {sCfg.text}
-                      </span>
-                    </td>
-                  </tr>
-                )
-              })}
+              {si === 3 ? renderContainerFields(sFields)
+               : si === 4 ? renderProductFields(sFields)
+               : sFields.map((f, fi) => renderFieldRow(f, fi, 12))}
             </React.Fragment>
           )
         })}
