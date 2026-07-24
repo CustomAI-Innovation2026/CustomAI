@@ -57,7 +57,7 @@ const MATCH_FIELDS = {
     'vessel_name','voyage_number',
     'port_of_loading','final_destination','sailing_date',
     'incoterm','payment_term','currency',
-    'total_quantity_pcs','total_cartons','total_amount','fob_value',
+    'total_quantity_pcs','total_cartons','total_amount','total_net_amount','fob_value',
   ],
   packing_list: [
     'invoice_number','invoice_date','po_number','sales_order','booking_number',
@@ -72,6 +72,7 @@ const MATCH_FIELDS = {
     'reference_no','exporter_name','consignee_name',
     'vessel_name','port_of_discharge',
     'importing_country','issuing_country','departure_date','declaration_place_date',
+    'hs_code','total_gross_weight_kgs','total_fob_value_usd',
   ],
 }
 
@@ -93,6 +94,7 @@ const CROSS_MATCH = {
     { L: null,                  R: 'booking_number',     label: 'Booking Number' },
     { L: null,                  R: 'currency',           label: 'Currency' },
     { L: null,                  R: 'total_amount',       label: 'Total Amount' },
+    { L: null,                  R: 'total_net_amount',   label: 'Total Net Amount' },
     { L: 'total_packages_count',R: 'total_cartons',      label: 'Total Packages / Cartons' },
     { L: 'gross_weight_kgs',    R: null,                 label: 'Gross Weight (KGS)' },
     { L: 'measurement_cbm',     R: null,                 label: 'Measurement (CBM)' },
@@ -137,14 +139,41 @@ const CROSS_MATCH = {
     { L: null,                R: 'total_measurement_cbm', label: 'Measurement (CBM)' },
   ],
   'bill_of_lading:form_d': [
-    { L: 'bl_number',           R: 'reference_no',      label: 'BL / Reference No.' },
-    { L: 'shipper_name',        R: 'exporter_name',     label: 'Shipper / Exporter' },
-    { L: 'consignee_name',      R: 'consignee_name',    label: 'Consignee' },
-    { L: 'vessel_name',         R: 'vessel_name',       label: 'Vessel Name' },
-    { L: 'port_of_discharge',   R: 'port_of_discharge', label: 'Port of Discharge' },
-    { L: null,                  R: 'importing_country', label: 'Importing Country' },
-    { L: null,                  R: 'issuing_country',   label: 'Issuing Country' },
-    { L: 'laden_on_board_date', R: 'departure_date',    label: 'On Board / Departure Date' },
+    { L: 'bl_number',            R: 'reference_no',           label: 'BL / Reference No.' },
+    { L: 'shipper_name',         R: 'exporter_name',          label: 'Shipper / Exporter' },
+    { L: 'consignee_name',       R: 'consignee_name',         label: 'Consignee' },
+    { L: 'vessel_name',          R: 'vessel_name',            label: 'Vessel Name' },
+    { L: 'port_of_discharge',    R: 'port_of_discharge',      label: 'Port of Discharge' },
+    { L: null,                   R: 'importing_country',      label: 'Importing Country' },
+    { L: null,                   R: 'issuing_country',        label: 'Issuing Country' },
+    { L: 'laden_on_board_date',  R: 'departure_date',         label: 'On Board / Departure Date' },
+    { L: 'total_packages_count', R: 'total_cartons',          label: 'Total Packages / Cartons' },
+    { L: 'gross_weight_kgs',     R: 'total_gross_weight_kgs', label: 'Gross Weight (KGS)' },
+    { L: null,                   R: 'hs_code',                label: 'HS Code' },
+    { L: null,                   R: 'total_fob_value_usd',    label: 'Total FOB Value (USD)' },
+  ],
+  'invoice:form_d': [
+    { L: 'shipper_name',     R: 'exporter_name',          label: 'Shipper / Exporter' },
+    { L: 'buyer_name',       R: 'consignee_name',         label: 'Consignee / Buyer' },
+    { L: 'vessel_name',      R: 'vessel_name',            label: 'Vessel Name' },
+    { L: 'sailing_date',     R: 'departure_date',         label: 'Sailing / Departure Date' },
+    { L: 'po_number',        R: null,                     label: 'PO Number' },
+    { L: 'invoice_number',   R: 'reference_no',           label: 'Invoice / Reference No.' },
+    { L: 'total_cartons',    R: 'total_cartons',          label: 'Total Packages / Cartons' },
+    { L: 'hs_code',          R: 'hs_code',                label: 'HS Code' },
+    { L: 'fob_value',        R: 'total_fob_value_usd',    label: 'FOB Value (USD)' },
+    { L: 'total_net_amount', R: null,                     label: 'Total Net Amount (USD)' },
+  ],
+  'packing_list:form_d': [
+    { L: 'shipper_name',           R: 'exporter_name',          label: 'Shipper / Exporter' },
+    { L: 'ship_to_name',           R: 'consignee_name',         label: 'Consignee / Ship To' },
+    { L: 'vessel_name',            R: 'vessel_name',            label: 'Vessel Name' },
+    { L: 'sailing_date',           R: 'departure_date',         label: 'Sailing / Departure Date' },
+    { L: 'po_number',              R: null,                     label: 'PO Number' },
+    { L: 'total_cartons',          R: 'total_cartons',          label: 'Total Packages / Cartons' },
+    { L: 'total_gross_weight_kgs', R: 'total_gross_weight_kgs', label: 'Gross Weight (KGS)' },
+    { L: null,                     R: 'hs_code',                label: 'HS Code' },
+    { L: null,                     R: 'total_fob_value_usd',    label: 'Total FOB Value (USD)' },
   ],
 }
 
@@ -540,7 +569,44 @@ function CompareTable({ fields, colDefs, isLight }) {
     return null
   }
 
-  function renderContainerFields(sFields) {
+  // Normalize label for cross-section matching: remove "total", units, punctuation
+  function normFieldLabel(s) {
+    return (s ?? '').toLowerCase()
+      .replace(/^total\s+/, '')
+      .replace(/\s*\(?(kgs?|cbm|ft|pcs?|cartons?)\)?$/i, '')
+      .replace(/[\s\(\)\[\]_\-\/,\.]+/g, '')
+  }
+
+  // Fill missing column values from any other field in allFields with a matching label
+  function enrichFromAllFields(f, allFields) {
+    const fNorm = normFieldLabel(f.field ?? f.label ?? '')
+    if (!fNorm) return f
+    const matches = allFields.filter(af => {
+      if (af === f) return false
+      const afNorm = normFieldLabel(af.field ?? af.label ?? '')
+      return afNorm === fNorm || afNorm.includes(fNorm) || fNorm.includes(afNorm)
+    })
+    if (matches.length === 0) return f
+    // Start with f values, fill missing from matching fields
+    const merged = {}
+    matches.forEach(m => {
+      Object.entries(m.values ?? {}).forEach(([k, v]) => { if ((v != null && v !== '') && !merged[k]) merged[k] = v })
+    })
+    Object.entries(f.values ?? {}).forEach(([k, v]) => { if (v != null && v !== '') merged[k] = v })
+    const leftVal  = f.leftVal  ?? matches.find(m => m.leftVal)?.leftVal  ?? null
+    const rightVal = f.rightVal ?? matches.find(m => m.rightVal)?.rightVal ?? null
+    const allVals  = Object.values(merged).filter(Boolean)
+    return {
+      ...f,
+      values: Object.keys(merged).length > 0 ? merged : f.values,
+      leftVal,
+      rightVal,
+      status: allVals.length >= 2 ? computeStatus(f.field ?? f.label ?? '', allVals) : f.status,
+    }
+  }
+
+  function renderContainerFields(sFields, allFields) {
+    const CN_RE = /^(container\s*no\.?|container\s*number)$/i
     const overviewFields = []
     const perContainerFields = []
     sFields.forEach(f => {
@@ -548,6 +614,10 @@ function CompareTable({ fields, colDefs, isLight }) {
       if (splitContainerLabel(lbl)) perContainerFields.push(f)
       else overviewFields.push(f)
     })
+
+    // Remove "Container Number/No." from overview — will be merged into 4.N header row
+    const cnOvField = overviewFields.find(f => CN_RE.test((f.field ?? f.label ?? '').trim()))
+    const cleanOverviewFields = overviewFields.filter(f => !CN_RE.test((f.field ?? f.label ?? '').trim()))
 
     const containerMap = {}
     const containerOrder = []
@@ -560,60 +630,143 @@ function CompareTable({ fields, colDefs, isLight }) {
       containerMap[cn].push({ ...f, field: sub })
     })
 
+    // Enrich overview fields with values from other sections
+    const enrichedOverviewFields = allFields
+      ? cleanOverviewFields.map(f => enrichFromAllFields(f, allFields))
+      : cleanOverviewFields
+
     const rows = []
-    if (overviewFields.length > 0) {
+    if (enrichedOverviewFields.length > 0) {
       rows.push(renderSubHeader('Total Container Overview', 'sub-ct-overview'))
-      overviewFields.forEach((f, fi) => rows.push(renderFieldRow(f, `ct-ov-${fi}`, 28)))
+      enrichedOverviewFields.forEach((f, fi) => rows.push(renderFieldRow(f, `ct-ov-${fi}`, 28)))
     }
     if (containerOrder.length > 0) {
       rows.push(renderSubHeader('Single Container', 'sub-ct-single'))
       containerOrder.forEach((cn, cnIdx) => {
         const cnFields = containerMap[cn]
-        const headerField = cnFields.find(f => f.field === 'Container No.') ?? null
-        const subFields   = cnFields.filter(f => f.field !== 'Container No.')
-        rows.push(renderGroupHeaderRow(`4.${cnIdx + 1}`, 'Container Number', cnIdx, headerField))
+        const baseHeader = cnFields.find(f => f.field === 'Container No.') ?? null
+        const rawSubFields = cnFields.filter(f => f.field !== 'Container No.')
+
+        // Enrich sub-fields: fill missing cols from overview + cross-section allFields
+        const subFields = rawSubFields.map(sf => {
+          // First try overview match
+          const enrichedFromOv = enrichFromAllFields(sf, cleanOverviewFields)
+          // Then cross-section fill from allFields
+          return allFields ? enrichFromAllFields(enrichedFromOv, allFields) : enrichedFromOv
+        })
+
+        // Merge PL (overview) container number values into header row for columns missing from per-container
+        let mergedHeader = baseHeader
+        if (cnOvField) {
+          const ovVals  = cnOvField.values  ?? {}
+          const baseVals = baseHeader?.values ?? {}
+          const merged  = { ...ovVals }
+          Object.entries(baseVals).forEach(([k, v]) => { if (v != null && v !== '') merged[k] = v })
+          const leftVal  = baseHeader?.leftVal  ?? cnOvField?.leftVal  ?? null
+          const rightVal = baseHeader?.rightVal ?? cnOvField?.rightVal ?? null
+          const allVals  = Object.values(merged).filter(Boolean)
+          mergedHeader = {
+            ...(baseHeader ?? cnOvField),
+            values: merged,
+            leftVal,
+            rightVal,
+            status: allVals.length >= 2 ? computeStatus('container_number', allVals) : 'none',
+          }
+        }
+
+        rows.push(renderGroupHeaderRow(`4.${cnIdx + 1}`, 'Container Number', cnIdx, mergedHeader))
         subFields.forEach((sf, sfi) => rows.push(renderFieldRow(sf, `ct-${cnIdx}-${sfi}`, 44)))
       })
     }
-    if (overviewFields.length === 0 && containerOrder.length === 0) {
+    if (enrichedOverviewFields.length === 0 && containerOrder.length === 0) {
       sFields.forEach((f, fi) => rows.push(renderFieldRow(f, `ct-flat-${fi}`, 12)))
     }
     return rows
   }
 
-  function renderProductFields(sFields) {
+  // Extract "3" from "Item 3 (No.06857)" for cross-doc item grouping
+  function normItemNum(key) {
+    const m = key.match(/Item\s+(\d+)/i)
+    return m ? m[1] : key
+  }
+
+  // Strip "800 CARTONS OF " or "2,150 CARTONS OF " prefix from product name
+  function cleanProductName(val) {
+    if (!val) return val
+    return String(val).replace(/^[\d,\.\s]+(?:CARTONS?\s+OF\s+)?/i, '').trim()
+  }
+
+  // Merge two field objects — non-null values from b fill nulls in a; a wins on conflict
+  function mergeFieldVals(a, b) {
+    const merged = { ...(b.values ?? {}) }
+    Object.entries(a.values ?? {}).forEach(([k, v]) => { if (v != null && v !== '') merged[k] = v })
+    return {
+      ...a,
+      values: Object.keys(merged).length ? merged : (a.values ?? {}),
+      leftVal:  a.leftVal  ?? b.leftVal  ?? null,
+      rightVal: a.rightVal ?? b.rightVal ?? null,
+    }
+  }
+
+  function renderProductFields(sFields, allFields) {
     const overviewFields = []
-    const itemMap = {}
+    // itemBuckets: normNum → { subMap: { subLabel → field } }
+    const itemBuckets = {}
     const itemOrder = []
 
     sFields.forEach(f => {
       const lbl = f.field ?? f.label ?? ''
       const m = lbl.match(/^(Item\s+\d+(?:\s*\([^)]+\))?)\s+(.+)$/)
       if (m) {
-        const itemKey = m[1].trim()
-        const sub = m[2].trim()
-        if (!itemMap[itemKey]) { itemMap[itemKey] = []; itemOrder.push(itemKey) }
-        itemMap[itemKey].push({ ...f, field: sub })
+        const normNum = normItemNum(m[1].trim())
+        const sub     = m[2].trim()
+        if (!itemBuckets[normNum]) { itemBuckets[normNum] = { subMap: {} }; itemOrder.push(normNum) }
+        const existing = itemBuckets[normNum].subMap[sub]
+        itemBuckets[normNum].subMap[sub] = existing
+          ? mergeFieldVals(existing, { ...f, field: sub })
+          : { ...f, field: sub }
       } else {
         overviewFields.push(f)
       }
     })
 
+    // Enrich overview fields cross-section
+    const enrichedOverview = allFields
+      ? overviewFields.map(f => enrichFromAllFields(f, allFields))
+      : overviewFields
+
     const rows = []
-    if (overviewFields.length > 0) {
+    if (enrichedOverview.length > 0) {
       rows.push(renderSubHeader('Total Product Overview', 'sub-pr-overview'))
-      overviewFields.forEach((f, fi) => rows.push(renderFieldRow(f, `pr-ov-${fi}`, 28)))
+      enrichedOverview.forEach((f, fi) => rows.push(renderFieldRow(f, `pr-ov-${fi}`, 28)))
     }
     if (itemOrder.length > 0) {
-      itemOrder.forEach((itemKey, iIdx) => {
-        const itemFields = itemMap[itemKey]
-        const nameField  = itemFields.find(f => f.field === 'Name') ?? null
-        const subFields  = nameField ? itemFields.filter(f => f.field !== 'Name') : itemFields
-        rows.push(renderGroupHeaderRow(`5.${iIdx + 1}`, `Item Product Name #${iIdx + 1}`, iIdx, nameField))
-        subFields.forEach((sf, sfi) => rows.push(renderFieldRow(sf, `pr-${iIdx}-${sfi}`, 44)))
+      itemOrder.forEach((normNum, iIdx) => {
+        const subFields  = Object.values(itemBuckets[normNum].subMap)
+        const nameField  = subFields.find(f => /^name$/i.test(f.field)) ?? null
+        const otherFields = nameField ? subFields.filter(f => !/^name$/i.test(f.field)) : subFields
+
+        // Clean name values: strip "N CARTONS OF " prefix
+        let headerField = nameField
+        if (nameField) {
+          const cleanVals = {}
+          Object.entries(nameField.values ?? {}).forEach(([k, v]) => { cleanVals[k] = cleanProductName(v) })
+          headerField = {
+            ...nameField,
+            values: Object.keys(cleanVals).length ? cleanVals : nameField.values,
+            leftVal:  cleanProductName(nameField.leftVal),
+            rightVal: cleanProductName(nameField.rightVal),
+          }
+        }
+
+        rows.push(renderGroupHeaderRow(`5.${iIdx + 1}`, `Item Product Name #${iIdx + 1}`, iIdx, headerField))
+        otherFields.forEach((sf, sfi) => {
+          const enriched = allFields ? enrichFromAllFields(sf, allFields) : sf
+          rows.push(renderFieldRow(enriched, `pr-${iIdx}-${sfi}`, 44))
+        })
       })
     }
-    if (overviewFields.length === 0 && itemOrder.length === 0) {
+    if (enrichedOverview.length === 0 && itemOrder.length === 0) {
       sFields.forEach((f, fi) => rows.push(renderFieldRow(f, `pr-flat-${fi}`, 12)))
     }
     return rows
@@ -661,8 +814,8 @@ function CompareTable({ fields, colDefs, isLight }) {
                   </div>
                 </td>
               </tr>
-              {si === 3 ? renderContainerFields(sFields)
-               : si === 4 ? renderProductFields(sFields)
+              {si === 3 ? renderContainerFields(sFields, fields)
+               : si === 4 ? renderProductFields(sFields, fields)
                : sFields.map((f, fi) => renderFieldRow(f, fi, 12))}
             </React.Fragment>
           )
